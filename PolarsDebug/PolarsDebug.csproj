@@ -1,0 +1,33 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <RustProjectDir>..\native_shim</RustProjectDir>
+    <RustLibPath>$(RustProjectDir)\target\debug\libnative_shim.so</RustLibPath>
+  </PropertyGroup>
+
+  <Target Name="BuildRust" BeforeTargets="BeforeBuild">
+    <Message Text="🦀 Building Rust Native Shim..." Importance="high" />
+    <Exec Command="cargo build" WorkingDirectory="$(RustProjectDir)" />
+  </Target>
+
+  <ItemGroup>
+    <Content Include="$(RustLibPath)">
+      <Link>libnative_shim.so</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Visible>false</Visible>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Apache.Arrow" Version="22.1.0" />
+  </ItemGroup>
+
+</Project>

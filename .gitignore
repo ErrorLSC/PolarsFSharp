@@ -1,0 +1,28 @@
+# --- Rust ---
+/native_shim/target/
+**/*.rs.bk
+Cargo.lock
+
+# --- .NET (C# & F#) ---
+**/bin/
+**/obj/
+.vs/
+.vscode/
+*.user
+*.suo
+*.tmp
+*.log
+*.txt
+
+# --- OS Files ---
+.DS_Store
+Thumbs.db
+
+# --- Test Data ---
+# 不提交测试生成的临时文件，但保留原始测试文件（如果有的话）
+*.csv
+*.parquet
+!test.csv
+!users.csv
+!sales.csv
+!dates.csv
