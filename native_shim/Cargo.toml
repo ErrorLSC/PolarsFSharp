@@ -4,14 +4,13 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-# 1. 主库 (提供高层 API: DataFrame, CsvReader)
+# 1. 主库 (提供高层 API)
 polars = { version = "0.50.0", features = ["lazy", "csv","dtype-date","parquet","strings","regex","timezones"] }
 
 # 2. 核心库 (提供 Series, 内存布局)
 polars-core = { version = "0.50.0" }
 
 # 3. Arrow 库 (提供 FFI, RecordBatch)
-# 我们直接用 Polars 内部使用的 Arrow，保证 100% 兼容
 polars-arrow = { version = "0.50.0" }
 
 polars-io = { version = "0.50.0", features = ["parquet","cloud"] }
