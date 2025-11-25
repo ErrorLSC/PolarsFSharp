@@ -3,96 +3,130 @@ use std::os::raw::c_char;
 use std::ops::Mul;
 use crate::types::{ExprContext, ptr_to_str};
 
-#[unsafe(no_mangle)]
-pub extern "C" fn pl_expr_col(name_ptr: *const c_char) -> *mut ExprContext {
-    let name = ptr_to_str(name_ptr).unwrap();
-    // Polars API: col("name")
-    let expr = col(name); 
-    Box::into_raw(Box::new(ExprContext { inner: expr }))
+// ==========================================
+// 1. 宏定义区域
+// ==========================================
+
+/// 模式 1: 基础类型字面量构造 (Literal Constructor)
+/// 生成: fn pl_expr_lit_i32(val: i32) -> *mut ExprContext
+macro_rules! gen_lit_ctor {
+    ($func_name:ident, $input_type:ty) => {
+        #[unsafe(no_mangle)]
+        pub extern "C" fn $func_name(val: $input_type) -> *mut ExprContext {
+            ffi_try!({
+                let expr = lit(val);
+                Ok(Box::into_raw(Box::new(ExprContext { inner: expr })))
+            })
+        }
+    };
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn pl_expr_lit_i32(val: i32) -> *mut ExprContext {
-    // Polars API: lit(10)
-    let expr = lit(val);
-    Box::into_raw(Box::new(ExprContext { inner: expr }))
+/// 模式 2: 字符串构造 (String Constructor)
+/// 生成: fn pl_expr_col(ptr: *const c_char) -> *mut ExprContext
+macro_rules! gen_str_ctor {
+    ($func_name:ident, $polars_func:ident) => {
+        #[unsafe(no_mangle)]
+        pub extern "C" fn $func_name(ptr: *const c_char) -> *mut ExprContext {
+            ffi_try!({
+                let s = ptr_to_str(ptr).unwrap();
+                let expr = $polars_func(s); // 调用 col(s) 或 lit(s)
+                Ok(Box::into_raw(Box::new(ExprContext { inner: expr })))
+            })
+        }
+    };
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn pl_expr_lit_str(val_ptr: *const c_char) -> *mut ExprContext {
-    let val = ptr_to_str(val_ptr).unwrap();
-    // Polars API: lit("string")
-    let expr = lit(val);
-    Box::into_raw(Box::new(ExprContext { inner: expr }))
+/// 模式 3: 一元操作 (Unary Operator)
+/// 生成: fn pl_expr_sum(ptr: *mut ExprContext) -> *mut ExprContext
+macro_rules! gen_unary_op {
+    ($func_name:ident, $method:ident) => {
+        #[unsafe(no_mangle)]
+        pub extern "C" fn $func_name(ptr: *mut ExprContext) -> *mut ExprContext {
+            ffi_try!({
+                // 1. 拿回所有权
+                let ctx = unsafe { Box::from_raw(ptr) };
+                // 2. 调用方法 (如 ctx.inner.sum())
+                let new_expr = ctx.inner.$method(); 
+                // 3. 返回
+                Ok(Box::into_raw(Box::new(ExprContext { inner: new_expr })))
+            })
+        }
+    };
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn pl_expr_lit_f64(val: f64) -> *mut ExprContext {
-    let expr = lit(val);
-    Box::into_raw(Box::new(ExprContext { inner: expr }))
+/// 模式 4: 二元操作 (Binary Operator)
+/// 生成: fn pl_expr_eq(left: *mut, right: *mut) -> *mut
+macro_rules! gen_binary_op {
+    ($func_name:ident, $method:ident) => {
+        #[unsafe(no_mangle)]
+        pub extern "C" fn $func_name(left_ptr: *mut ExprContext, right_ptr: *mut ExprContext) -> *mut ExprContext {
+            ffi_try!({
+                let left = unsafe { Box::from_raw(left_ptr) };
+                let right = unsafe { Box::from_raw(right_ptr) };
+                
+                // 调用 left.inner.eq(right.inner)
+                let new_expr = left.inner.$method(right.inner);
+                
+                Ok(Box::into_raw(Box::new(ExprContext { inner: new_expr })))
+            })
+        }
+    };
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn pl_expr_eq(left_ptr: *mut ExprContext, right_ptr: *mut ExprContext) -> *mut ExprContext {
-    let left = unsafe { Box::from_raw(left_ptr) };
-    let right = unsafe { Box::from_raw(right_ptr) };
-    
-    // Polars API: left.eq(right)
-    let new_expr = left.inner.eq(right.inner);
-    
-    Box::into_raw(Box::new(ExprContext { inner: new_expr }))
+/// 模式 5: 命名空间一元操作 (Namespace Unary)
+/// 专门处理 .dt().year(), .str().to_uppercase() 这种
+macro_rules! gen_namespace_unary {
+    ($func_name:ident, $ns:ident, $method:ident) => {
+        #[unsafe(no_mangle)]
+        pub extern "C" fn $func_name(ptr: *mut ExprContext) -> *mut ExprContext {
+            ffi_try!({
+                let ctx = unsafe { Box::from_raw(ptr) };
+                // 例如: ctx.inner.dt().year()
+                let new_expr = ctx.inner.$ns().$method();
+                Ok(Box::into_raw(Box::new(ExprContext { inner: new_expr })))
+            })
+        }
+    };
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn pl_expr_gt(left_ptr: *mut ExprContext, right_ptr: *mut ExprContext) -> *mut ExprContext {
-    // 拿到两个积木
-    let left = unsafe { Box::from_raw(left_ptr) };
-    let right = unsafe { Box::from_raw(right_ptr) };
-    
-    // 组合它们: left.gt(right)
-    // 注意：Polars 的运算符重载会消耗所有权，所以我们正好用了 Box::from_raw
-    let new_expr = left.inner.gt(right.inner);
-    
-    Box::into_raw(Box::new(ExprContext { inner: new_expr }))
-}
+// ==========================================
+// 2. 宏应用区域 (Boilerplate 消灭术)
+// ==========================================
 
-#[unsafe(no_mangle)]
-pub extern "C" fn pl_expr_mul(left_ptr: *mut ExprContext, right_ptr: *mut ExprContext) -> *mut ExprContext {
-    let left = unsafe { Box::from_raw(left_ptr) };
-    let right = unsafe { Box::from_raw(right_ptr) };
-    // left * right
-    let new_expr = left.inner.mul(right.inner); 
-    Box::into_raw(Box::new(ExprContext { inner: new_expr }))
-}
+// --- Group 1: 构造函数 ---
+gen_lit_ctor!(pl_expr_lit_i32, i32);
+gen_lit_ctor!(pl_expr_lit_f64, f64);
+
+// --- Group 2: 字符串构造 ---
+gen_str_ctor!(pl_expr_col, col);
+gen_str_ctor!(pl_expr_lit_str, lit);
+
+// --- Group 3: 一元操作 ---
+gen_unary_op!(pl_expr_sum, sum);
+gen_unary_op!(pl_expr_mean, mean);
+gen_unary_op!(pl_expr_max, max);
+gen_unary_op!(pl_expr_min, min);
+// gen_unary_op!(pl_expr_abs, abs);
+
+// --- Group 4: 二元操作 ---
+gen_binary_op!(pl_expr_eq, eq);
+gen_binary_op!(pl_expr_gt, gt);
+gen_binary_op!(pl_expr_mul, mul);
+
+// --- Group 5: 命名空间操作 ---
+// dt 命名空间
+gen_namespace_unary!(pl_expr_dt_year, dt, year);
+gen_namespace_unary!(pl_expr_dt_month, dt, month);
 
 #[unsafe(no_mangle)]
 pub extern "C" fn pl_expr_alias(expr_ptr: *mut ExprContext, name_ptr: *const c_char) -> *mut ExprContext {
-    let expr_ctx = unsafe { Box::from_raw(expr_ptr) };
-    let name = ptr_to_str(name_ptr).unwrap();
-    // expr.alias("new_name")
-    let new_expr = expr_ctx.inner.alias(name);
-    Box::into_raw(Box::new(ExprContext { inner: new_expr }))
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn pl_expr_sum(ptr: *mut ExprContext) -> *mut ExprContext {
-    let ctx = unsafe { Box::from_raw(ptr) };
-    let new_expr = ctx.inner.sum();
-    Box::into_raw(Box::new(ExprContext { inner: new_expr }))
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn pl_expr_mean(ptr: *mut ExprContext) -> *mut ExprContext {
-    let ctx = unsafe { Box::from_raw(ptr) };
-    let new_expr = ctx.inner.mean();
-    Box::into_raw(Box::new(ExprContext { inner: new_expr }))
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn pl_expr_max(ptr: *mut ExprContext) -> *mut ExprContext {
-    let ctx = unsafe { Box::from_raw(ptr) };
-    let new_expr = ctx.inner.max();
-    Box::into_raw(Box::new(ExprContext { inner: new_expr }))
+    ffi_try!({
+        let expr_ctx = unsafe { Box::from_raw(expr_ptr) };
+        let name = ptr_to_str(name_ptr).unwrap();
+        // alias 逻辑
+        let new_expr = expr_ctx.inner.alias(name);
+        Ok(Box::into_raw(Box::new(ExprContext { inner: new_expr })))
+    })
 }
 
 // ==========================================
@@ -103,28 +137,14 @@ pub extern "C" fn pl_expr_str_contains(
     expr_ptr: *mut ExprContext, 
     pat_ptr: *const c_char
 ) -> *mut ExprContext {
-    let ctx = unsafe { Box::from_raw(expr_ptr) };
-    let pat = ptr_to_str(pat_ptr).unwrap();
-    
-    // Polars API: col("a").str().contains(lit("pattern"), strict=false)
-    // 注意：0.50 API 可能会变，通常在 str() 命名空间下
-    // strict=true 意味着如果不是字符串类型会报错
-    let new_expr = ctx.inner.str().contains(lit(pat), false);
-    
-    Box::into_raw(Box::new(ExprContext { inner: new_expr }))
-}
-
-// ==========================================
-// 时间序列 (Temporal Ops)
-// ==========================================
-
-#[unsafe(no_mangle)]
-pub extern "C" fn pl_expr_dt_year(ptr: *mut ExprContext) -> *mut ExprContext {
-    let ctx = unsafe { Box::from_raw(ptr) };
-    
-    // Polars API: col("date").dt().year()
-    // 注意：.dt() 进入日期命名空间
-    let new_expr = ctx.inner.dt().year();
-    
-    Box::into_raw(Box::new(ExprContext { inner: new_expr }))
+    ffi_try!({
+        let ctx = unsafe { Box::from_raw(expr_ptr) };
+        let pat = ptr_to_str(pat_ptr).unwrap();
+        
+        // str().contains() 比较特殊，有两个参数 (pattern, strict)
+        // 这里的 false 是 hardcode 的 strict 参数，如果想暴露出去，需要修改 C 接口签名
+        let new_expr = ctx.inner.str().contains(lit(pat), false);
+        
+        Ok(Box::into_raw(Box::new(ExprContext { inner: new_expr })))
+    })
 }
