@@ -1,8 +1,7 @@
 use polars::prelude::*;
 use std::os::raw::c_char;
-use std::ops::Mul;
 use crate::types::{ExprContext, ptr_to_str};
-
+use std::ops::{Add, Sub, Mul, Div, Rem};
 // ==========================================
 // 1. 宏定义区域
 // ==========================================
@@ -106,12 +105,29 @@ gen_unary_op!(pl_expr_sum, sum);
 gen_unary_op!(pl_expr_mean, mean);
 gen_unary_op!(pl_expr_max, max);
 gen_unary_op!(pl_expr_min, min);
+
+// 逻辑非 (!)
+gen_unary_op!(pl_expr_not, not);
+
 // gen_unary_op!(pl_expr_abs, abs);
 
 // --- Group 4: 二元操作 ---
-gen_binary_op!(pl_expr_eq, eq);
-gen_binary_op!(pl_expr_gt, gt);
-gen_binary_op!(pl_expr_mul, mul);
+gen_binary_op!(pl_expr_eq, eq); // ==
+gen_binary_op!(pl_expr_neq, neq); // !=
+gen_binary_op!(pl_expr_gt, gt); // >
+gen_binary_op!(pl_expr_gt_eq, gt_eq); // >=
+gen_binary_op!(pl_expr_lt, lt);       // <
+gen_binary_op!(pl_expr_lt_eq, lt_eq); // <=
+// 算术运算
+gen_binary_op!(pl_expr_add, add); // +
+gen_binary_op!(pl_expr_sub, sub); // -
+gen_binary_op!(pl_expr_mul, mul); // *
+gen_binary_op!(pl_expr_div, div); // /
+gen_binary_op!(pl_expr_rem, rem); // % (取余)
+// 逻辑运算
+gen_binary_op!(pl_expr_and, and); // &
+gen_binary_op!(pl_expr_or, or);   // |
+gen_binary_op!(pl_expr_xor, xor);
 
 // --- Group 5: 命名空间操作 ---
 // dt 命名空间
