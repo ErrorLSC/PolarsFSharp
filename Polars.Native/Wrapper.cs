@@ -70,6 +70,21 @@ public static class PolarsWrapper
     }
 
     // --- Eager Ops ---
+    public static long DataFrameHeight(DataFrameHandle df)
+    {
+        return (long)NativeBindings.pl_dataframe_height(df);
+    }
+
+    public static long DataFrameWidth(DataFrameHandle df)
+    {
+    return (long)NativeBindings.pl_dataframe_width(df);
+    }
+
+    public static DataFrameHandle Head(DataFrameHandle df, uint n)
+    {
+        return ErrorHelper.Check(NativeBindings.pl_head(df, (UIntPtr)n));
+    }
+
     public static DataFrameHandle Filter(DataFrameHandle df, ExprHandle expr)
     {
         var h = NativeBindings.pl_filter(df, expr);
@@ -193,4 +208,17 @@ public static class PolarsWrapper
         lf.SetHandleAsInvalid();
         return ErrorHelper.Check(h);
     }
+    // --- Clone Ops ---
+    public static LazyFrameHandle CloneLazy(LazyFrameHandle lf)
+    {
+        // 注意：这里不需要 Invalidate lf，因为 Rust 侧只是借用
+        return ErrorHelper.Check(NativeBindings.pl_lazy_clone(lf));
+    }
+
+    public static ExprHandle CloneExpr(ExprHandle expr)
+    {
+        return ErrorHelper.Check(NativeBindings.pl_expr_clone(expr));
+    }
+
+
 }

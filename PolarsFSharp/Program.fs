@@ -20,7 +20,7 @@ module App =
             
             df 
             |> Polars.filter (Polars.col "age" .> Polars.lit 25)
-            |> Polars.show
+            |> Polars.show 10
             |> ignore
 
             printfn "--- Lazy API Test ---"
@@ -30,7 +30,7 @@ module App =
             |> Polars.filterLazy (Polars.col "salary" .> Polars.lit 5500)
             |> Polars.withColumn (Polars.col "age" .* Polars.lit 2 |> Polars.alias "age_doubled")
             |> Polars.collect
-            |> Polars.show
+            |> Polars.show 10
             |> ignore
 
         with ex -> 

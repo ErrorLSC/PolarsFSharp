@@ -58,6 +58,11 @@ module Polars =
         let h = PolarsWrapper.Join(left.Handle, other.Handle, lHandles, rHandles, how)
         new DataFrame(h)
 
+    let head (n: int) (df: DataFrame) : DataFrame =
+        // 这里的 n 转 uint，PolarsWrapper 接收 uint
+        let h = PolarsWrapper.Head(df.Handle, uint n)
+        new DataFrame(h)
+
     let sum (e: Expr) = e.Sum()
     let mean (e: Expr) = e.Mean()
     let max (e: Expr) = e.Max()
@@ -70,34 +75,66 @@ module Polars =
 
     let scanParquet (path: string) = new LazyFrame(PolarsWrapper.ScanParquet(path))
 
+// 1. Filter
     let filterLazy (expr: Expr) (lf: LazyFrame) : LazyFrame =
-        let h = PolarsWrapper.LazyFilter(lf.Handle, expr.Handle)
+        // 关键点：
+        // 1. 克隆 lf (因为 Rust 会消耗它)
+        // 2. 克隆 expr (因为 Rust 也会消耗它，而用户可能想复用 expr)
+        let lfClone = lf.CloneHandle()
+        let exprClone = expr.CloneHandle()
+        
+        let h = PolarsWrapper.LazyFilter(lfClone, exprClone)
         new LazyFrame(h)
 
+    // 2. Select
     let selectLazy (exprs: Expr list) (lf: LazyFrame) : LazyFrame =
-        let handles = exprs |> List.map (fun e -> e.Handle) |> List.toArray
-        let h = PolarsWrapper.LazySelect(lf.Handle, handles)
+        let lfClone = lf.CloneHandle()
+        // 列表里的每个 Expr 都要克隆
+        let handles = exprs |> List.map (fun e -> e.CloneHandle()) |> List.toArray
+        
+        let h = PolarsWrapper.LazySelect(lfClone, handles)
         new LazyFrame(h)
 
+    // 3. Sort
     let orderBy (expr: Expr) (desc: bool) (lf: LazyFrame) : LazyFrame =
-        let h = PolarsWrapper.LazySort(lf.Handle, expr.Handle, desc)
+        let lfClone = lf.CloneHandle()
+        let exprClone = expr.CloneHandle()
+        let h = PolarsWrapper.LazySort(lfClone, exprClone, desc)
         new LazyFrame(h)
 
+    // 4. Limit
     let limit (n: uint) (lf: LazyFrame) : LazyFrame =
-        let h = PolarsWrapper.LazyLimit(lf.Handle, n)
+        let lfClone = lf.CloneHandle()
+        let h = PolarsWrapper.LazyLimit(lfClone, n)
         new LazyFrame(h)
 
+    // 5. WithColumn
     let withColumn (expr: Expr) (lf: LazyFrame) : LazyFrame =
-        let handles = [| expr.Handle |]
-        let h = PolarsWrapper.LazyWithColumns(lf.Handle, handles)
+        let lfClone = lf.CloneHandle()
+        let exprClone = expr.CloneHandle()
+        let handles = [| exprClone |] // 使用克隆的 handle
+        let h = PolarsWrapper.LazyWithColumns(lfClone, handles)
         new LazyFrame(h)
 
     let withColumns (exprs: Expr list) (lf: LazyFrame) : LazyFrame =
-        let handles = exprs |> List.map (fun e -> e.Handle) |> List.toArray
-        let h = PolarsWrapper.LazyWithColumns(lf.Handle, handles)
+        // 1. 克隆 LazyFrame
+        let lfClone = lf.CloneHandle()
+        
+        // 2. 克隆列表里的每一个 Expr
+        // 注意：这里必须用 CloneHandle()，否则原来的 Expr 列表也会失效
+        let handles = exprs |> List.map (fun e -> e.CloneHandle()) |> List.toArray
+        
+        // 3. 调用 C# Wrapper (传入的全是副本)
+        let h = PolarsWrapper.LazyWithColumns(lfClone, handles)
         new LazyFrame(h)
 
-    let collect (lf: LazyFrame) : DataFrame = lf.Collect()
+    // 6. Collect (触发执行)
+    let collect (lf: LazyFrame) : DataFrame = 
+        // Collect 也会消耗 LazyFrame，所以也要克隆！
+        // 这样你可以 collect 多次 (例如一次 show，一次 save)
+        let lfClone = lf.CloneHandle()
+        let dfHandle = PolarsWrapper.LazyCollect(lfClone)
+        new DataFrame(dfHandle)
 
     // --- Show / Helper ---
     // 为了保持文件整洁，formatValue 可以设为 private
@@ -121,17 +158,32 @@ module Polars =
                 if v.HasValue then v.Value.ToString() else "(null)"
             | _ -> sprintf "[%s]" (col.GetType().Name)
 
-    let show (df: DataFrame) : DataFrame =
-        use batch = df.ToArrow()
-        printfn "\n--- Polars DataFrame (Rows: %d) ---" batch.Length
+    let show (rows: int) (df: DataFrame) : DataFrame =
+        // 1. 获取总行数 (零拷贝，瞬间完成)
+        let totalRows = df.Rows
+        
+        // 2. 决定实际要切多少行 (不能超过总行数)
+        let n = Math.Min(int64 rows, totalRows)
+        
+        // 3. 切片并转换
+        // 只有这 n 行会被拷贝
+        let previewDf = df |> head (int n)
+        use batch = previewDf.ToArrow()
+
+        printfn "\n--- Polars DataFrame (Showing %d / %d rows) ---" batch.Length totalRows
         let fields = batch.Schema.FieldsList
+        
         for field in fields do
             let col = batch.Column(field.Name)
             let typeName = if isNull col.Data then "Unknown" else col.Data.DataType.Name
+            
             printfn "[%s: %s]" field.Name typeName
             
-            let limit = Math.Min(batch.Length, 5)
-            for i in 0 .. limit - 1 do
+            for i in 0 .. batch.Length - 1 do
+                // 这里的 formatValue 就是你之前写的那个 helper
                 printfn "  %s" (formatValue col i)
-            if batch.Length > 5 then printfn "  ..."
+        
+        printfn "--------------------------------------------"
+        
+        // 返回原始 df
         df

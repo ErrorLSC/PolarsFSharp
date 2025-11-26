@@ -8,7 +8,7 @@ open Polars.Native
 // ==========================================
 type Expr(handle: ExprHandle) =
     member _.Handle = handle
-
+    member internal this.CloneHandle() = PolarsWrapper.CloneExpr(handle)
     // 运算符重载
     static member (.>) (lhs: Expr, rhs: Expr) = new Expr(PolarsWrapper.Gt(lhs.Handle, rhs.Handle))
     static member (.==) (lhs: Expr, rhs: Expr) = new Expr(PolarsWrapper.Eq(lhs.Handle, rhs.Handle))
@@ -34,23 +34,20 @@ type DataFrame(handle: DataFrameHandle) =
     
     member _.Handle = handle
     
-    // 这里的 ToArrow 只是为了方便内部逻辑，
-    // 具体拿数据的逻辑放在这里没问题
+    // 依然保留，用于 Show 或者用户真的需要 Arrow 数据时
     member this.ToArrow() = PolarsWrapper.Collect(handle)
-    // 此处以后应修改为从rust拿数
-    member this.Rows = 
-        use batch = this.ToArrow()
-        batch.Length
-    // 此处以后应修改为从rust拿数
-    member this.Columns = 
-        use batch = this.ToArrow()
-        batch.ColumnCount
+
+    // 零拷贝获取行数
+    member _.Rows = PolarsWrapper.DataFrameHeight(handle)
+
+    // 零拷贝获取列数
+    member _.Columns = PolarsWrapper.DataFrameWidth(handle)
 
 // LazyFrame 封装
 // 它依赖 DataFrame (Collect 返回 DataFrame)，所以必须定义在 DataFrame 后面
 type LazyFrame(handle: LazyFrameHandle) =
     member _.Handle = handle
-    
+    member internal this.CloneHandle() = PolarsWrapper.CloneLazy(handle)
     member this.Collect() = 
         let dfHandle = PolarsWrapper.LazyCollect(handle)
         new DataFrame(dfHandle)

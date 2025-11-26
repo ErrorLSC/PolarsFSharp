@@ -171,3 +171,15 @@ pub extern "C" fn pl_free_string(ptr: *mut std::os::raw::c_char) {
         unsafe { let _ = std::ffi::CString::from_raw(ptr); }
     }
 }
+
+// 克隆逻辑计划
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_lazy_clone(lf_ptr: *mut LazyFrameContext) -> *mut LazyFrameContext {
+    // 注意：这里用 &*lf_ptr 借用，而不是 Box::from_raw 消费
+    let ctx = unsafe { &*lf_ptr };
+    
+    // LazyFrame 的 clone 只是复制查询计划，非常快
+    let new_lf = ctx.inner.clone();
+    
+    Box::into_raw(Box::new(LazyFrameContext { inner: new_lf }))
+}

@@ -149,3 +149,29 @@ pub extern "C" fn pl_join(
         Ok(Box::into_raw(Box::new(DataFrameContext { df: res_df })))
     })
 }
+
+// ==========================================
+// Head (取头)
+// ==========================================
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_dataframe_height(df_ptr: *mut DataFrameContext) -> usize {
+    let ctx = unsafe { &*df_ptr };
+    ctx.df.height()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_dataframe_width(ptr: *mut DataFrameContext) -> usize {
+    if ptr.is_null() { return 0; }
+    let ctx = unsafe { &*ptr };
+    ctx.df.width()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_head(df_ptr: *mut DataFrameContext, n: usize) -> *mut DataFrameContext {
+    ffi_try!({
+        let ctx = unsafe { &*df_ptr };
+        // head 只是切片，开销极小
+        let res_df = ctx.df.head(Some(n));
+        Ok(Box::into_raw(Box::new(DataFrameContext { df: res_df })))
+    })
+}

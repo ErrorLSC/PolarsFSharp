@@ -28,6 +28,15 @@ unsafe internal partial class NativeBindings
     public static extern ExprHandle pl_expr_gt(ExprHandle left, ExprHandle right);
 
     [DllImport(LibName)]
+    public static extern UIntPtr pl_dataframe_height(DataFrameHandle df);
+    
+    [DllImport(LibName)]
+    public static extern UIntPtr pl_dataframe_width(DataFrameHandle df);
+
+    [DllImport(LibName)]
+    public static extern DataFrameHandle pl_head(DataFrameHandle df, UIntPtr n);
+
+    [DllImport(LibName)]
     public static extern DataFrameHandle pl_filter(DataFrameHandle df, ExprHandle expr);
 
     [DllImport(LibName)]
@@ -62,6 +71,9 @@ unsafe internal partial class NativeBindings
 
     [DllImport(LibName)] 
     public static extern ExprHandle pl_expr_dt_year(ExprHandle expr);
+
+    [DllImport(LibName)]
+    public static extern ExprHandle pl_expr_clone(ExprHandle expr);
 
     [DllImport(LibName)]
     public static extern DataFrameHandle pl_groupby_agg(
@@ -103,7 +115,9 @@ unsafe internal partial class NativeBindings
     [DllImport(LibName)] 
     public static extern LazyFrameHandle pl_lazy_sort(LazyFrameHandle lf, ExprHandle expr, bool desc);
     [DllImport(LibName)]
-     public static extern DataFrameHandle pl_lazy_collect(LazyFrameHandle lf);
+    public static extern DataFrameHandle pl_lazy_collect(LazyFrameHandle lf);
+    [DllImport(LibName)]
+    public static extern LazyFrameHandle pl_lazy_clone(LazyFrameHandle lf);
 
     [DllImport(LibName)] public static extern LazyFrameHandle pl_lazy_limit(LazyFrameHandle lf, uint n);
     [DllImport(LibName)] public static extern LazyFrameHandle pl_lazy_with_columns(LazyFrameHandle lf, IntPtr[] exprs, UIntPtr len);

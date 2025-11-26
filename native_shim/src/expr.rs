@@ -148,3 +148,13 @@ pub extern "C" fn pl_expr_str_contains(
         Ok(Box::into_raw(Box::new(ExprContext { inner: new_expr })))
     })
 }
+
+// ==========================================
+// 复用expr
+// ==========================================
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_expr_clone(ptr: *mut ExprContext) -> *mut ExprContext {
+    let ctx = unsafe { &*ptr };
+    let new_expr = ctx.inner.clone();
+    Box::into_raw(Box::new(ExprContext { inner: new_expr }))
+}
