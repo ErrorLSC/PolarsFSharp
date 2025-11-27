@@ -2,7 +2,6 @@ namespace PolarsFSharp
 
 open System
 open Apache.Arrow
-open Apache.Arrow.Types
 open Polars.Native
 
 module Polars =
@@ -67,6 +66,11 @@ module Polars =
     let mean (e: Expr) = e.Mean()
     let max (e: Expr) = e.Max()
     let min (e: Expr) = e.Min()
+    let fillNull (fillValue: Expr) (e: Expr) = e.FillNull(fillValue)
+    
+    let isNull (e: Expr) = e.IsNull()
+    
+    let isNotNull (e: Expr) = e.IsNotNull()
 
     // --- Lazy API ---
     let scanCsv (path: string) (tryParseDates: bool option) = 
@@ -175,7 +179,7 @@ module Polars =
         
         for field in fields do
             let col = batch.Column(field.Name)
-            let typeName = if isNull col.Data then "Unknown" else col.Data.DataType.Name
+            let typeName = field.DataType.Name
             
             printfn "[%s: %s]" field.Name typeName
             

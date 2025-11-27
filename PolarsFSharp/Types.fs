@@ -36,7 +36,18 @@ type Expr(handle: ExprHandle) =
     member this.Max() = new Expr(PolarsWrapper.Max(handle))
     member this.Min() = new Expr(PolarsWrapper.Min(handle))
     member this.StrContains(pattern: string) = new Expr(PolarsWrapper.StrContains(handle, pattern))
+    // FillNull (填充空值)
+    // 
+    member this.FillNull(fillValue: Expr) = 
+        new Expr(PolarsWrapper.FillNull(this.CloneHandle(), fillValue.CloneHandle()))
 
+    // IsNull (检查是否为空)
+    member this.IsNull() = 
+        new Expr(PolarsWrapper.IsNull(this.CloneHandle()))
+
+    // IsNotNull
+    member this.IsNotNull() = 
+        new Expr(PolarsWrapper.IsNotNull(this.CloneHandle()))
     member this.Dt = new DtOps(handle)
 
 and DtOps(handle: ExprHandle) =

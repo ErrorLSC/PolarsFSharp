@@ -2,13 +2,6 @@ namespace Polars.Native;
 
 public static partial class PolarsWrapper
 {
-    // --- Expr Ops (工厂方法) ---
-    // 这些方法返回新的 ExprHandle，所有权在 C# 这边，直到传给 Filter/Select
-    // Leaf Nodes (不消耗其他 Expr)
-    public static ExprHandle Col(string name) => ErrorHelper.Check(NativeBindings.pl_expr_col(name));
-    public static ExprHandle Lit(int val) => ErrorHelper.Check(NativeBindings.pl_expr_lit_i32(val));
-    public static ExprHandle Lit(string val) => ErrorHelper.Check(NativeBindings.pl_expr_lit_str(val));
-    public static ExprHandle Lit(double val) => ErrorHelper.Check(NativeBindings.pl_expr_lit_f64(val));
     // Unary Nodes (消耗 1 个 Expr)
     private static ExprHandle UnaryOp(Func<ExprHandle, ExprHandle> op, ExprHandle expr)
     {
@@ -16,6 +9,21 @@ public static partial class PolarsWrapper
         expr.SetHandleAsInvalid();
         return ErrorHelper.Check(h);
     }
+    // Binary Nodes (消耗 2 个 Expr)
+    private static ExprHandle BinaryOp(Func<ExprHandle, ExprHandle, ExprHandle> op, ExprHandle l, ExprHandle r)
+    {
+        var h = op(l, r);
+        l.SetHandleAsInvalid();
+        r.SetHandleAsInvalid();
+        return ErrorHelper.Check(h);
+    }
+    // --- Expr Ops (工厂方法) ---
+    // 这些方法返回新的 ExprHandle，所有权在 C# 这边，直到传给 Filter/Select
+    // Leaf Nodes (不消耗其他 Expr)
+    public static ExprHandle Col(string name) => ErrorHelper.Check(NativeBindings.pl_expr_col(name));
+    public static ExprHandle Lit(int val) => ErrorHelper.Check(NativeBindings.pl_expr_lit_i32(val));
+    public static ExprHandle Lit(string val) => ErrorHelper.Check(NativeBindings.pl_expr_lit_str(val));
+    public static ExprHandle Lit(double val) => ErrorHelper.Check(NativeBindings.pl_expr_lit_f64(val));
 
     public static ExprHandle Alias(ExprHandle expr, string name) 
     {
@@ -35,13 +43,7 @@ public static partial class PolarsWrapper
         e.SetHandleAsInvalid();
         return ErrorHelper.Check(h);
     }
-    private static ExprHandle BinaryOp(Func<ExprHandle, ExprHandle, ExprHandle> op, ExprHandle l, ExprHandle r)
-    {
-        var h = op(l, r);
-        l.SetHandleAsInvalid();
-        r.SetHandleAsInvalid();
-        return ErrorHelper.Check(h);
-    }
+
 
     // Compare
     public static ExprHandle Eq(ExprHandle l, ExprHandle r) => BinaryOp(NativeBindings.pl_expr_eq, l, r);
@@ -60,6 +62,18 @@ public static partial class PolarsWrapper
     public static ExprHandle And(ExprHandle l, ExprHandle r) => BinaryOp(NativeBindings.pl_expr_and, l, r);
     public static ExprHandle Or(ExprHandle l, ExprHandle r) => BinaryOp(NativeBindings.pl_expr_or, l, r);
     public static ExprHandle Not(ExprHandle e) => UnaryOp(NativeBindings.pl_expr_not, e);
+
+    // Null Handling
+    public static ExprHandle FillNull(ExprHandle expr, ExprHandle fillValue) 
+        => BinaryOp(NativeBindings.pl_expr_fill_null, expr, fillValue);
+
+    public static ExprHandle IsNull(ExprHandle expr) 
+        => UnaryOp(NativeBindings.pl_expr_is_null, expr);
+
+    public static ExprHandle IsNotNull(ExprHandle expr) 
+        => UnaryOp(NativeBindings.pl_expr_is_not_null, expr);
+    
+    // expr clone
     public static ExprHandle CloneExpr(ExprHandle expr)
     {
         return ErrorHelper.Check(NativeBindings.pl_expr_clone(expr));

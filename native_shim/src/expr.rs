@@ -105,11 +105,12 @@ gen_unary_op!(pl_expr_sum, sum);
 gen_unary_op!(pl_expr_mean, mean);
 gen_unary_op!(pl_expr_max, max);
 gen_unary_op!(pl_expr_min, min);
-
+// gen_unary_op!(pl_expr_abs, abs);
 // 逻辑非 (!)
 gen_unary_op!(pl_expr_not, not);
-
-// gen_unary_op!(pl_expr_abs, abs);
+// is_null()
+gen_unary_op!(pl_expr_is_null, is_null);
+gen_unary_op!(pl_expr_is_not_null, is_not_null);
 
 // --- Group 4: 二元操作 ---
 gen_binary_op!(pl_expr_eq, eq); // ==
@@ -128,6 +129,10 @@ gen_binary_op!(pl_expr_rem, rem); // % (取余)
 gen_binary_op!(pl_expr_and, and); // &
 gen_binary_op!(pl_expr_or, or);   // |
 gen_binary_op!(pl_expr_xor, xor);
+// Null Ops
+gen_binary_op!(pl_expr_fill_null, fill_null);
+
+
 
 // --- Group 5: 命名空间操作 ---
 // dt 命名空间
