@@ -72,6 +72,29 @@ public static partial class PolarsWrapper
 
     public static ExprHandle IsNotNull(ExprHandle expr) 
         => UnaryOp(NativeBindings.pl_expr_is_not_null, expr);
+
+    // IsBetween
+    public static ExprHandle IsBetween(ExprHandle expr, ExprHandle lower, ExprHandle upper)
+    {
+        var h = NativeBindings.pl_expr_is_between(expr, lower, upper);
+        // 记得销毁所有输入 Handle
+        expr.SetHandleAsInvalid();
+        lower.SetHandleAsInvalid();
+        upper.SetHandleAsInvalid();
+        return ErrorHelper.Check(h);
+    }
+
+    // Lit DateTime
+    public static ExprHandle Lit(DateTime dt)
+    {
+        // C# DateTime.Ticks 是自 0001-01-01 以来的 100ns 单位
+        // Unix Epoch 是 1970-01-01
+        long unixEpochTicks = 621355968000000000;
+        long ticksSinceEpoch = dt.Ticks - unixEpochTicks;
+        long micros = ticksSinceEpoch / 10; // 100ns -> 1us (除以10)
+        
+        return ErrorHelper.Check(NativeBindings.pl_expr_lit_datetime(micros));
+    }
     
     // expr clone
     public static ExprHandle CloneExpr(ExprHandle expr)

@@ -50,6 +50,10 @@ type Expr(handle: ExprHandle) =
     member this.IsNotNull() = 
         new Expr(PolarsWrapper.IsNotNull(this.CloneHandle()))
 
+    // IsBetween
+    member this.IsBetween(lower: Expr, upper: Expr) =
+        new Expr(PolarsWrapper.IsBetween(this.CloneHandle(), lower.CloneHandle(), upper.CloneHandle()))
+
     member this.Map(func: Func<IArrowArray, IArrowArray>) =
         new Expr(PolarsWrapper.Map(this.CloneHandle(), func))
     member this.Map(func: Func<IArrowArray, IArrowArray>, outputType: PlDataType) =
@@ -90,7 +94,7 @@ type DataFrame(handle: DataFrameHandle) =
     member this.Float(colName: string, rowIndex: int) : float option = 
         let nullableVal = PolarsWrapper.GetDouble(handle, colName, int64 rowIndex)
         if nullableVal.HasValue then Some nullableVal.Value else None
-    member this.String(colName: string, rowIndex: int) = PolarsWrapper.GetString(handle, colName, int64 rowIndex)
+    member this.String(colName: string, rowIndex: int) = PolarsWrapper.GetString(handle, colName, int64 rowIndex) |> Option.ofObj
 
 // LazyFrame 封装
 // 它依赖 DataFrame (Collect 返回 DataFrame)，所以必须定义在 DataFrame 后面

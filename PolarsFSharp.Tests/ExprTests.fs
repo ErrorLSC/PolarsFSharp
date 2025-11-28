@@ -1,5 +1,6 @@
 namespace PolarsFSharp.Tests
 
+open System
 open Xunit
 open PolarsFSharp
 
@@ -31,7 +32,7 @@ type ``Expression Logic Tests`` () =
             
             // 使用新的 Option 取值 API 验证
             // Qinglei
-            Assert.Equal("Qinglei", res.String("name", 0)) 
+            Assert.Equal("Qinglei", res.String("name", 0).Value) 
             // BMI ≈ 21.6
             Assert.True(res.Float("bmi", 0).Value > 21.6)
     [<Fact>]
@@ -97,3 +98,34 @@ type ``Expression Logic Tests`` () =
         let df= Polars.readCsv csv.Path None 
         let nulls = df |> Polars.filter (Polars.col "age" |> Polars.isNull)
         Assert.Equal(1L, nulls.Rows)
+    [<Fact>]
+    member _.``IsBetween with DateTime Literals`` () =
+        // 构造数据: Qinglei 的生日
+        use csv = new TempCsv("name,birthdate,height\nQinglei,1990-05-20,1.80\nTooOld,1980-01-01,1.80\nTooShort,1990-05-20,1.60")
+        
+        // 必须开启日期解析
+        let df = Polars.readCsv csv.Path (Some true)
+
+        // Python logic translation:
+        // filter(
+        //    col("birthdate").is_between(date(1982,12,31), date(1996,1,1)),
+        //    col("height") > 1.7
+        // )
+        
+        // 定义边界
+        let startDt = DateTime(1982, 12, 31)
+        let endDt = DateTime(1996, 1, 1)
+
+        let res = 
+            df 
+            |> Polars.filter (
+                // 条件 1: 生日区间
+                (Polars.col "birthdate").IsBetween(Polars.lit startDt, Polars.lit endDt)
+                .&& // 条件 2: AND
+                // 条件 3: 身高
+                (Polars.col "height" .> Polars.lit 1.7)
+            )
+
+        // 验证: 只有 Qinglei 符合
+        Assert.Equal(1L, res.Rows)
+        Assert.Equal("Qinglei", res.String("name", 0).Value)

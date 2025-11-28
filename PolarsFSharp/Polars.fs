@@ -15,6 +15,7 @@ module Polars =
         static member ($) (LitMechanism, v: int) = new Expr(PolarsWrapper.Lit(v))
         static member ($) (LitMechanism, v: string) = new Expr(PolarsWrapper.Lit(v))
         static member ($) (LitMechanism, v: double) = new Expr(PolarsWrapper.Lit(v))
+        static member ($) (LitMechanism, v: DateTime) = new Expr(PolarsWrapper.Lit(v))
 
     let inline lit (value: ^T) : Expr = 
         ((^T or LitMechanism) : (static member ($) : LitMechanism * ^T -> Expr) (LitMechanism, value))

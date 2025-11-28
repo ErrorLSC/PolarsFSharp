@@ -105,6 +105,12 @@ unsafe internal partial class NativeBindings
     [DllImport(LibName)] public static extern ExprHandle pl_expr_is_not_null(ExprHandle expr);
 
     [DllImport(LibName)]
+    public static extern ExprHandle pl_expr_is_between(ExprHandle expr, ExprHandle lower, ExprHandle upper);
+
+    [DllImport(LibName)]
+    public static extern ExprHandle pl_expr_lit_datetime(long micros);
+
+    [DllImport(LibName)]
     public static extern ExprHandle pl_expr_alias(ExprHandle expr, [MarshalAs(UnmanagedType.LPUTF8Str)] string name);
 
     [DllImport(LibName)]

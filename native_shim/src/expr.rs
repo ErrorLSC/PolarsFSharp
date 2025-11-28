@@ -203,3 +203,19 @@ pub extern "C" fn pl_expr_is_between(
         Ok(Box::into_raw(Box::new(ExprContext { inner: new_expr })))
     })
 }
+
+// --- DateTime Literal ---
+// 接收一个 i64 (微秒时间戳)，返回一个 Datetime 类型的 Expr
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_expr_lit_datetime(
+    micros: i64
+) -> *mut ExprContext {
+    ffi_try!({
+        // 1. 先造一个 Int64 字面量
+        let lit_expr = lit(micros);
+        // 2. Cast 成 Datetime (Microseconds)
+        let dt_expr = lit_expr.cast(DataType::Datetime(TimeUnit::Microseconds, None));
+        
+        Ok(Box::into_raw(Box::new(ExprContext { inner: dt_expr })))
+    })
+}
