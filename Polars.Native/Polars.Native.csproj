@@ -13,6 +13,10 @@
     <RustLibPath>$(RustProjectDir)\target\debug\libnative_shim.so</RustLibPath>
   </PropertyGroup>
 
+  <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+    <RustLibPath>$(RustProjectDir)\target\debug\native_shim.dll</RustLibPath>
+  </PropertyGroup>
+
   <Target Name="BuildRust" BeforeTargets="BeforeBuild">
     <Message Text="🦀 Building Rust Native Shim..." Importance="high" />
     <Exec Command="cargo build" WorkingDirectory="$(RustProjectDir)" />
