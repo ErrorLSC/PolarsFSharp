@@ -6,6 +6,7 @@ mod io;
 mod eager;
 mod lazy;
 mod udf;
+mod selectors;
 
 
 

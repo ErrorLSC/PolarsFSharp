@@ -69,7 +69,12 @@ public static partial class PolarsWrapper
         e.SetHandleAsInvalid();
         return ErrorHelper.Check(h);
     }
-
+    public static ExprHandle StrSplit(ExprHandle e, string pat) 
+    {
+        var h = NativeBindings.pl_expr_str_split(e, pat);
+        e.SetHandleAsInvalid();
+        return ErrorHelper.Check(h);
+    }
 
     // Compare
     public static ExprHandle Eq(ExprHandle l, ExprHandle r) => BinaryOp(NativeBindings.pl_expr_eq, l, r);
@@ -108,6 +113,12 @@ public static partial class PolarsWrapper
         expr.SetHandleAsInvalid(); // 消耗掉 expr
         return ErrorHelper.Check(h);
     }
+    public static ExprHandle Round(ExprHandle e, uint decimals)
+    {
+        var h = NativeBindings.pl_expr_round(e, decimals);
+        e.SetHandleAsInvalid();
+        return ErrorHelper.Check(h);
+    }
     // IsBetween
     public static ExprHandle IsBetween(ExprHandle expr, ExprHandle lower, ExprHandle upper)
     {
@@ -129,6 +140,31 @@ public static partial class PolarsWrapper
         long micros = ticksSinceEpoch / 10; // 100ns -> 1us (除以10)
         
         return ErrorHelper.Check(NativeBindings.pl_expr_lit_datetime(micros));
+    }
+
+    // List
+    public static ExprHandle ListFirst(ExprHandle e) => UnaryOp(NativeBindings.pl_expr_list_first, e);
+    
+    public static ExprHandle ListGet(ExprHandle e, long index)
+    {
+        var h = NativeBindings.pl_expr_list_get(e, index);
+        e.SetHandleAsInvalid();
+        return ErrorHelper.Check(h);
+    }
+
+    // Naming
+    public static ExprHandle Prefix(ExprHandle e, string p)
+    {
+        var h = NativeBindings.pl_expr_prefix(e, p);
+        e.SetHandleAsInvalid();
+        return ErrorHelper.Check(h);
+    }
+    
+    public static ExprHandle Suffix(ExprHandle e, string s)
+    {
+        var h = NativeBindings.pl_expr_suffix(e, s);
+        e.SetHandleAsInvalid();
+        return ErrorHelper.Check(h);
     }
     // Expr Length
     public static ExprHandle Len() => ErrorHelper.Check(NativeBindings.pl_expr_len());

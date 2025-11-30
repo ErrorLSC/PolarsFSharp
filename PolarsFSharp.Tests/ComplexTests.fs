@@ -55,3 +55,28 @@ type ``Complex Query Tests`` () =
         // Row 1: 1990 -> 1
         Assert.Equal(2020L, res.Int("decade", 1).Value)
         Assert.Equal(2L, int64 (res.Int("cnt", 1).Value))
+
+    [<Fact>]
+    member _.``Complex Transformation (Selector Exclude)`` () =
+        use csv = new TempCsv("name,weight,height,ignore_me\nZhang,70,1.75,999")
+        let lf = Polars.scanCsv csv.Path None
+
+        let res = 
+            lf
+            |> Polars.withColumn (
+                // 1. String Split -> List -> First
+                // "Zhang San" -> ["Zhang", "San"] -> "Zhang"
+                (Polars.col "name").Str.Split(" ").List.First().Alias("first_name")
+            )
+            |> Polars.selectLazy [
+                // 2. Exclude (all except "ignore_me")
+                Polars.all() |> Polars.exclude ["ignore_me"] |> Polars.asExpr
+            ]
+            |> Polars.withColumns [
+                // 3. Round & Prefix
+                // 对 weight 四舍五入并加前缀
+                (Polars.col "weight").Round(2).Name.Prefix("avg_")
+            ]
+            |> Polars.collect
+
+        Assert.DoesNotContain("ignore_me", res.ColumnNames)

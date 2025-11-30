@@ -31,3 +31,8 @@ public class LazyFrameHandle : PolarsHandle
 {
     protected override bool ReleaseHandle() => true;
 }
+
+public class SelectorHandle : PolarsHandle 
+{ 
+    protected override bool ReleaseHandle() => true; 
+}

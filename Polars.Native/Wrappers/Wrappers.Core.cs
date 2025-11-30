@@ -1,5 +1,6 @@
 using Apache.Arrow.C;
 using Apache.Arrow;
+using System.Runtime.InteropServices;
 
 namespace Polars.Native;
 
@@ -37,6 +38,37 @@ public static partial class PolarsWrapper
         {
             CArrowArray.Free(array);
             CArrowSchema.Free(schema);
+        }
+    }
+    private static R UseUtf8StringArray<R>(string[] strings, Func<IntPtr[], R> action)
+    {
+        if (strings == null || strings.Length == 0)
+        {
+            return action(System.Array.Empty<IntPtr>());
+        }
+
+        var ptrs = new IntPtr[strings.Length];
+        try
+        {
+            // 分配内存
+            for (int i = 0; i < strings.Length; i++)
+            {
+                ptrs[i] = Marshal.StringToCoTaskMemUTF8(strings[i]);
+            }
+
+            // 执行操作
+            return action(ptrs);
+        }
+        finally
+        {
+            // 清理内存
+            for (int i = 0; i < ptrs.Length; i++)
+            {
+                if (ptrs[i] != IntPtr.Zero)
+                {
+                    Marshal.FreeCoTaskMem(ptrs[i]);
+                }
+            }
         }
     }
 }

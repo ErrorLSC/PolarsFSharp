@@ -111,6 +111,7 @@ unsafe internal partial class NativeBindings
     [DllImport(LibName)] public static extern ExprHandle pl_expr_sqrt(ExprHandle expr);
     [DllImport(LibName)] public static extern ExprHandle pl_expr_exp(ExprHandle expr);
     [DllImport(LibName)] public static extern ExprHandle pl_expr_log(ExprHandle expr, double baseVal);
+    [DllImport(LibName)] public static extern ExprHandle pl_expr_round(ExprHandle expr, uint decimals);
 
     [DllImport(LibName)]
     public static extern ExprHandle pl_expr_is_between(ExprHandle expr, ExprHandle lower, ExprHandle upper);
@@ -203,19 +204,38 @@ unsafe internal partial class NativeBindings
     
     [DllImport(LibName)] 
     public static extern ExprHandle pl_expr_str_slice(ExprHandle expr, long offset, ulong length);
-    
+    [DllImport(LibName)] 
+    public static extern ExprHandle pl_expr_str_split(ExprHandle expr, [MarshalAs(UnmanagedType.LPUTF8Str)] string pat);
     [DllImport(LibName)] 
     public static extern ExprHandle pl_expr_str_replace_all(
         ExprHandle expr, 
         [MarshalAs(UnmanagedType.LPUTF8Str)] string pat, 
         [MarshalAs(UnmanagedType.LPUTF8Str)] string val
     );
+
+    // List Ops
+    [DllImport(LibName)] public static extern ExprHandle pl_expr_list_first(ExprHandle expr);
+    [DllImport(LibName)] public static extern ExprHandle pl_expr_list_get(ExprHandle expr, long index);
+    // Naming
+    [DllImport(LibName)] public static extern ExprHandle pl_expr_prefix(ExprHandle expr, [MarshalAs(UnmanagedType.LPUTF8Str)] string prefix);
+    [DllImport(LibName)] public static extern ExprHandle pl_expr_suffix(ExprHandle expr, [MarshalAs(UnmanagedType.LPUTF8Str)] string suffix);
     // Expr Len
     [DllImport(LibName)] 
     public static extern ExprHandle pl_expr_len();
     [DllImport(LibName)] public static extern IntPtr pl_get_last_error();
     [DllImport(LibName)] public static extern void pl_free_error_msg(IntPtr ptr);
+    [DllImport(LibName)] 
+    public static extern SelectorHandle pl_selector_clone(SelectorHandle sel);
+    // Selectors
+    [DllImport(LibName)] public static extern SelectorHandle pl_selector_all();
+    
+    [DllImport(LibName)] 
+    public static extern SelectorHandle pl_selector_exclude(
+        SelectorHandle sel, 
+        IntPtr[] names,
+        UIntPtr len
+    );
 
-
+    [DllImport(LibName)] public static extern ExprHandle pl_selector_into_expr(SelectorHandle sel);
 
 }

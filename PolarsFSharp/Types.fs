@@ -10,6 +10,8 @@ open Apache.Arrow
 type Expr(handle: ExprHandle) =
     member _.Handle = handle
     member internal this.CloneHandle() = PolarsWrapper.CloneExpr(handle)
+    // --- Helpers ---
+    member this.Round(decimals: int) = new Expr(PolarsWrapper.Round(this.CloneHandle(), uint decimals))
     // 运算符重载, Compare
     static member (.>) (lhs: Expr, rhs: Expr) = new Expr(PolarsWrapper.Gt(lhs.Handle, rhs.Handle))
     static member (.<) (lhs: Expr, rhs: Expr) = new Expr(PolarsWrapper.Lt(lhs.Handle, rhs.Handle))
@@ -74,6 +76,10 @@ type Expr(handle: ExprHandle) =
     // 自然对数 (快捷方式)
     member this.Ln() = 
         this.Log(Math.E)
+
+    // --- Namespaces ---
+    member this.Name = new NameOps(this.CloneHandle())
+    member this.List = new ListOps(this.CloneHandle())
     // IsBetween
     member this.IsBetween(lower: Expr, upper: Expr) =
         new Expr(PolarsWrapper.IsBetween(this.CloneHandle(), lower.CloneHandle(), upper.CloneHandle()))
@@ -109,7 +115,31 @@ and StringOps(handle: ExprHandle) =
     // 包含 (之前做的)
     member _.Contains(pat: string) = 
         new Expr(PolarsWrapper.StrContains(handle, pat))
+    member _.Split(separator: string) = new Expr(PolarsWrapper.StrSplit(handle, separator))
+and NameOps(handle: ExprHandle) =
+    let wrap op arg = new Expr(op(handle, arg))
+    member _.Prefix(p: string) = wrap PolarsWrapper.Prefix p
+    member _.Suffix(s: string) = wrap PolarsWrapper.Suffix s
 
+and ListOps(handle: ExprHandle) =
+    member _.First() = new Expr(PolarsWrapper.ListFirst(handle))
+    member _.Get(index: int) = new Expr(PolarsWrapper.ListGet(handle, int64 index))
+
+type Selector(handle: SelectorHandle) =
+    member _.Handle = handle
+    
+    member internal this.CloneHandle() = 
+        PolarsWrapper.CloneSelector(handle)
+
+    // Exclude 方法
+    member this.Exclude(names: string list) =
+        let arr = List.toArray names
+        // 使用 CloneHandle，防止 this.Handle 被消耗
+        new Selector(PolarsWrapper.SelectorExclude(this.CloneHandle(), arr))
+
+    member this.ToExpr() =
+        // 转换也会消耗 Selector，所以要 Clone
+        new Expr(PolarsWrapper.SelectorToExpr(this.CloneHandle()))
 
 // DataFrame 封装
 type DataFrame(handle: DataFrameHandle) =

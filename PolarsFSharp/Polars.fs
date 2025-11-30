@@ -172,7 +172,11 @@ module Polars =
         let lfClone = lf.CloneHandle()
         let dfHandle = PolarsWrapper.LazyCollect(lfClone)
         new DataFrame(dfHandle)
-
+    // all() 现在返回 Selector
+    let all () = new Selector(PolarsWrapper.SelectorAll())
+    let asExpr (s: Selector) = s.ToExpr()
+    // exclude 专门针对 Selector
+    let exclude (names: string list) (s: Selector) = s.Exclude(names)
     // --- Show / Helper ---
     // 为了保持文件整洁，formatValue 可以设为 private
     let private formatValue (col: IArrowArray) (index: int) : string =

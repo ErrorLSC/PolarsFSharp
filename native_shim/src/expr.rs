@@ -1,5 +1,4 @@
 use polars::prelude::*;
-use polars::prelude::ClosedInterval;
 use std::os::raw::c_char;
 use crate::types::{ExprContext, ptr_to_str};
 use std::ops::{Add, Sub, Mul, Div, Rem};
@@ -146,6 +145,8 @@ gen_namespace_unary!(pl_expr_dt_month, dt, month);
 gen_namespace_unary!(pl_expr_str_to_uppercase, str, to_uppercase);
 gen_namespace_unary!(pl_expr_str_to_lowercase, str, to_lowercase);
 gen_namespace_unary!(pl_expr_str_len_bytes, str, len_bytes);
+// --- List Ops (list 命名空间) ---
+gen_namespace_unary!(pl_expr_list_first, list, first);
 
 #[unsafe(no_mangle)]
 pub extern "C" fn pl_expr_alias(expr_ptr: *mut ExprContext, name_ptr: *const c_char) -> *mut ExprContext {
@@ -213,6 +214,20 @@ pub extern "C" fn pl_expr_str_replace_all(
     })
 }
 
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_expr_str_split(
+    expr_ptr: *mut ExprContext, 
+    pat_ptr: *const c_char
+) -> *mut ExprContext {
+    ffi_try!({
+        let ctx = unsafe { Box::from_raw(expr_ptr) };
+        let pat = ptr_to_str(pat_ptr).unwrap();
+        // by_lengths=false (也就是 split by pattern)
+        let new_expr = ctx.inner.str().split(lit(pat));
+        Ok(Box::into_raw(Box::new(ExprContext { inner: new_expr })))
+    })
+}
+
 // ==========================================
 // 复用expr
 // ==========================================
@@ -262,6 +277,22 @@ pub extern "C" fn pl_expr_lit_datetime(
     })
 }
 // ==========================================
+// List Ops
+// ==========================================
+// list.get(index)
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_expr_list_get(
+    expr_ptr: *mut ExprContext, 
+    index: i64
+) -> *mut ExprContext {
+    ffi_try!({
+        let ctx = unsafe { Box::from_raw(expr_ptr) };
+        let new_expr = ctx.inner.list().get(lit(index),true);
+        Ok(Box::into_raw(Box::new(ExprContext { inner: new_expr })))
+    })
+}
+
+// ==========================================
 // Math
 // ==========================================
 #[unsafe(no_mangle)]
@@ -276,6 +307,20 @@ pub extern "C" fn pl_expr_log(
         Ok(Box::into_raw(Box::new(ExprContext { inner: new_expr })))
     })
 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_expr_round(
+    expr_ptr: *mut ExprContext, 
+    decimals: u32
+) -> *mut ExprContext {
+    ffi_try!({
+        let ctx = unsafe { Box::from_raw(expr_ptr) };
+        // round 默认行为
+        let new_expr = ctx.inner.round(decimals, RoundMode::HalfAwayFromZero); 
+        Ok(Box::into_raw(Box::new(ExprContext { inner: new_expr })))
+    })
+}
+
 // ==========================================
 // Meta Data
 // ==========================================
@@ -285,5 +330,31 @@ pub extern "C" fn pl_expr_len() -> *mut ExprContext {
         // polars::prelude::len()
         let expr = len(); 
         Ok(Box::into_raw(Box::new(ExprContext { inner: expr })))
+    })
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_expr_prefix(
+    expr_ptr: *mut ExprContext, 
+    prefix_ptr: *const c_char
+) -> *mut ExprContext {
+    ffi_try!({
+        let ctx = unsafe { Box::from_raw(expr_ptr) };
+        let prefix = ptr_to_str(prefix_ptr).unwrap();
+        let new_expr = ctx.inner.name().prefix(prefix);
+        Ok(Box::into_raw(Box::new(ExprContext { inner: new_expr })))
+    })
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_expr_suffix(
+    expr_ptr: *mut ExprContext, 
+    suffix_ptr: *const c_char
+) -> *mut ExprContext {
+    ffi_try!({
+        let ctx = unsafe { Box::from_raw(expr_ptr) };
+        let suffix = ptr_to_str(suffix_ptr).unwrap();
+        let new_expr = ctx.inner.name().suffix(suffix);
+        Ok(Box::into_raw(Box::new(ExprContext { inner: new_expr })))
     })
 }
