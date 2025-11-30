@@ -61,6 +61,8 @@ unsafe internal partial class NativeBindings
     [DllImport(LibName)] public static extern IntPtr pl_dataframe_get_string(DataFrameHandle df, [MarshalAs(UnmanagedType.LPUTF8Str)] string colName, UIntPtr row);
     [DllImport(LibName)]
     public static extern DataFrameHandle pl_head(DataFrameHandle df, UIntPtr n);
+    [DllImport(LibName)]
+    public static extern DataFrameHandle pl_tail(DataFrameHandle df, UIntPtr n);
 
     [DllImport(LibName)]
     public static extern DataFrameHandle pl_filter(DataFrameHandle df, ExprHandle expr);
@@ -153,6 +155,8 @@ unsafe internal partial class NativeBindings
         IntPtr[] rightOn, UIntPtr rightLen,
         [MarshalAs(UnmanagedType.LPUTF8Str)] string how
     );
+    [DllImport(LibName)] 
+    public static extern DataFrameHandle pl_sort(DataFrameHandle df, ExprHandle expr, bool descending);
     // Parquet
     [DllImport(LibName)] 
     public static extern void pl_write_csv(DataFrameHandle df, [MarshalAs(UnmanagedType.LPUTF8Str)] string path);
@@ -176,6 +180,12 @@ unsafe internal partial class NativeBindings
     public static extern LazyFrameHandle pl_lazy_select(LazyFrameHandle lf, IntPtr[] exprs, UIntPtr len);
     [DllImport(LibName)] 
     public static extern LazyFrameHandle pl_lazy_sort(LazyFrameHandle lf, ExprHandle expr, bool desc);
+    [DllImport(LibName)] 
+    public static extern LazyFrameHandle pl_lazy_groupby_agg(
+        LazyFrameHandle lf, 
+        IntPtr[] keys, UIntPtr keysLen, 
+        IntPtr[] aggs, UIntPtr aggsLen
+    );
     [DllImport(LibName)]
     public static extern DataFrameHandle pl_lazy_collect(LazyFrameHandle lf);
     [DllImport(LibName)]
@@ -200,7 +210,9 @@ unsafe internal partial class NativeBindings
         [MarshalAs(UnmanagedType.LPUTF8Str)] string pat, 
         [MarshalAs(UnmanagedType.LPUTF8Str)] string val
     );
-
+    // Expr Len
+    [DllImport(LibName)] 
+    public static extern ExprHandle pl_expr_len();
     [DllImport(LibName)] public static extern IntPtr pl_get_last_error();
     [DllImport(LibName)] public static extern void pl_free_error_msg(IntPtr ptr);
 

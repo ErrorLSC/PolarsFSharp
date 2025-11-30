@@ -32,3 +32,26 @@ type ``Complex Query Tests`` () =
             |> Polars.collect
 
         Assert.Equal(1L, df.Rows)
+
+    [<Fact>]
+    member _.``GroupBy Queries`` () =
+        use csv = new TempCsv("name,birthdate,weight,height\nBen Brown,1985-02-15,72.5,1.77\nQinglei,2025-11-25,70.0,1.80\nZhang,2025-10-31,55,1.75")
+        let lf = Polars.scanCsv csv.Path (Some true)
+
+        let res = 
+            lf 
+            |> Polars.groupByLazy
+                [(Polars.col "birthdate").Dt.Year() / Polars.lit 10 * Polars.lit 10 |> Polars.alias "decade" ]
+                [ Polars.count().Alias("cnt")] 
+            |> Polars.sortLazy (Polars.col "decade") false
+            |> Polars.collect
+
+        // 验证
+        // Row 0: 1980 -> 2
+        Assert.Equal(1980L, res.Int("decade", 0).Value)
+        // 注意：count() 返回通常是 UInt32 或 UInt64，我们用 Int64 读取是安全的
+        Assert.Equal(1L, int64 (res.Int("cnt", 0).Value)) 
+
+        // Row 1: 1990 -> 1
+        Assert.Equal(2020L, res.Int("decade", 1).Value)
+        Assert.Equal(2L, int64 (res.Int("cnt", 1).Value))

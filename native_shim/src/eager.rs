@@ -153,6 +153,32 @@ pub extern "C" fn pl_join(
     })
 }
 // ==========================================
+// Sort
+// ==========================================
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_sort(
+    df_ptr: *mut DataFrameContext,
+    expr_ptr: *mut ExprContext,
+    descending: bool
+) -> *mut DataFrameContext {
+    ffi_try!({
+        let ctx = unsafe { &*df_ptr };
+        let expr_ctx = unsafe { Box::from_raw(expr_ptr) };
+        
+        // 0.50+ Eager Sort 支持表达式
+        let res_df = ctx.df.clone()
+            .lazy()
+            // LazyFrame::sort 接受 Expr 列表
+            .sort_by_exprs(
+                vec![expr_ctx.inner], 
+                SortMultipleOptions::default().with_order_descending(descending)
+            )
+            .collect()?;
+
+        Ok(Box::into_raw(Box::new(DataFrameContext { df: res_df })))
+    })
+}
+// ==========================================
 // DataFrame Ops
 // ==========================================
 

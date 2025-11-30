@@ -37,7 +37,21 @@ public static partial class PolarsWrapper
         lf.SetHandleAsInvalid();
         return ErrorHelper.Check(h);
     }
-    
+    public static LazyFrameHandle LazyGroupByAgg(LazyFrameHandle lf, ExprHandle[] keys, ExprHandle[] aggs)
+    {
+        var keyPtrs = HandlesToPtrs(keys);
+        var aggPtrs = HandlesToPtrs(aggs);
+        
+        // lf 也会被消耗
+        var h = NativeBindings.pl_lazy_groupby_agg(
+            lf, 
+            keyPtrs, (UIntPtr)keyPtrs.Length, 
+            aggPtrs, (UIntPtr)aggPtrs.Length
+        );
+        
+        lf.SetHandleAsInvalid();
+        return ErrorHelper.Check(h);
+    }
     public static LazyFrameHandle LazyWithColumns(LazyFrameHandle lf, ExprHandle[] handles)
     {
         var raw = HandlesToPtrs(handles);

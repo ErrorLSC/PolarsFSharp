@@ -173,7 +173,7 @@ type ``String Logic Tests`` () =
 
         // 目标逻辑: weight / (height ^ 2)
         let bmiExpr = 
-            (Polars.col "weight") / (Polars.col "height")  **  Polars.lit 2
+            (Polars.col "weight") / (Polars.col "height") .** Polars.lit 2
             |> Polars.alias "bmi"
 
         let res = 

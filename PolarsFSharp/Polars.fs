@@ -35,7 +35,10 @@ module Polars =
     let writeParquet (path: string) (df: DataFrame) = 
         PolarsWrapper.WriteParquet(df.Handle, path)
         df
-
+    // --- Expr Helpers ---
+    // [新增] count/len
+    let count () = new Expr(PolarsWrapper.Len())
+    let len () = new Expr(PolarsWrapper.Len())
     // --- Eager Ops ---
     let withColumnsEager (exprs: Expr list) (df: DataFrame) : DataFrame =
         let handles = exprs |> List.map (fun e -> e.Handle) |> List.toArray
@@ -49,6 +52,16 @@ module Polars =
         let handles = exprs |> List.map (fun e -> e.Handle) |> List.toArray
         let h = PolarsWrapper.Select(df.Handle, handles)
         new DataFrame(h)
+
+    let sort (expr: Expr) (desc: bool) (df: DataFrame) : DataFrame =
+        // Clone Handle (因为 Eager 操作不应消耗 Expr 的原始引用，虽然底层消耗了 handle)
+        // 这里的逻辑稍微有点绕：Wrapper.Sort 会消耗 ExprHandle。
+        // 为了让 F# 的 Expr 对象可复用，我们需要 CloneHandle。
+        let h = PolarsWrapper.Sort(df.Handle, expr.CloneHandle(), desc)
+        new DataFrame(h)
+
+    // 保留 orderBy 别名
+    let orderBy (expr: Expr) (desc: bool) (df: DataFrame) = sort expr desc df
 
     let groupBy (keys: Expr list) (aggs: Expr list) (df: DataFrame) : DataFrame =
         let kHandles = keys |> List.map (fun e -> e.Handle) |> List.toArray
@@ -109,11 +122,14 @@ module Polars =
         new LazyFrame(h)
 
     // 3. Sort
-    let orderBy (expr: Expr) (desc: bool) (lf: LazyFrame) : LazyFrame =
+    let sortLazy (expr: Expr) (desc: bool) (lf: LazyFrame) : LazyFrame =
         let lfClone = lf.CloneHandle()
         let exprClone = expr.CloneHandle()
         let h = PolarsWrapper.LazySort(lfClone, exprClone, desc)
         new LazyFrame(h)
+
+    // 别名
+    let orderByLazy (expr: Expr) (desc: bool) (lf: LazyFrame) = sortLazy expr desc lf
 
     // 4. Limit
     let limit (n: uint) (lf: LazyFrame) : LazyFrame =
@@ -140,8 +156,16 @@ module Polars =
         // 3. 调用 C# Wrapper (传入的全是副本)
         let h = PolarsWrapper.LazyWithColumns(lfClone, handles)
         new LazyFrame(h)
-
-    // 6. Collect (触发执行)
+    // 6. GroupBy
+    // 用法: lf |> Polars.groupByLazy [col "a"] [count()]
+    let groupByLazy (keys: Expr list) (aggs: Expr list) (lf: LazyFrame) : LazyFrame =
+        let lfClone = lf.CloneHandle()
+        let kHandles = keys |> List.map (fun e -> e.CloneHandle()) |> List.toArray
+        let aHandles = aggs |> List.map (fun e -> e.CloneHandle()) |> List.toArray
+        
+        let h = PolarsWrapper.LazyGroupByAgg(lfClone, kHandles, aHandles)
+        new LazyFrame(h)
+    // 7. Collect (触发执行)
     let collect (lf: LazyFrame) : DataFrame = 
         // Collect 也会消耗 LazyFrame，所以也要克隆！
         // 这样你可以 collect 多次 (例如一次 show，一次 save)

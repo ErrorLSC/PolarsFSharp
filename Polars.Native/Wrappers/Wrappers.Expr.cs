@@ -130,7 +130,8 @@ public static partial class PolarsWrapper
         
         return ErrorHelper.Check(NativeBindings.pl_expr_lit_datetime(micros));
     }
-    
+    // Expr Length
+    public static ExprHandle Len() => ErrorHelper.Check(NativeBindings.pl_expr_len());
     // expr clone
     public static ExprHandle CloneExpr(ExprHandle expr)
     {

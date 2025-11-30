@@ -276,3 +276,14 @@ pub extern "C" fn pl_expr_log(
         Ok(Box::into_raw(Box::new(ExprContext { inner: new_expr })))
     })
 }
+// ==========================================
+// Meta Data
+// ==========================================
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_expr_len() -> *mut ExprContext {
+    ffi_try!({
+        // polars::prelude::len()
+        let expr = len(); 
+        Ok(Box::into_raw(Box::new(ExprContext { inner: expr })))
+    })
+}

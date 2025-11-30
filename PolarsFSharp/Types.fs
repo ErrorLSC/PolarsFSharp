@@ -23,7 +23,7 @@ type Expr(handle: ExprHandle) =
     static member ( * ) (lhs: Expr, rhs: Expr) = new Expr(PolarsWrapper.Mul(lhs.Handle, rhs.Handle))
     static member ( / ) (lhs: Expr, rhs: Expr) = new Expr(PolarsWrapper.Div(lhs.Handle, rhs.Handle))
     static member ( % ) (lhs: Expr, rhs: Expr) = new Expr(PolarsWrapper.Rem(lhs.Handle, rhs.Handle))
-    static member ( ** ) (baseExpr: Expr, exponent: Expr) = baseExpr.Pow(exponent)
+    static member (.**) (baseExpr: Expr, exponent: Expr) = baseExpr.Pow(exponent)
     // --- 逻辑运算符 ---
     // 使用 .&& 和 .|| 避免与 F# 的短路逻辑 && 冲突
     static member (.&&) (lhs: Expr, rhs: Expr) = new Expr(PolarsWrapper.And(lhs.Handle, rhs.Handle))

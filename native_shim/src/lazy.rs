@@ -100,7 +100,7 @@ gen_lazy_single_expr_op!(pl_lazy_filter, filter);
 // limit 在 Polars 中通常接受 IdxSize (u32)
 gen_lazy_scalar_op!(pl_lazy_limit, limit, u32);
 // 也可以加个 tail
-// gen_lazy_scalar_op!(pl_lazy_tail, tail, u32);
+gen_lazy_scalar_op!(pl_lazy_tail, tail, u32);
 
 // ==========================================
 // 4. 特殊函数 (Sort & Collect)
@@ -124,6 +124,26 @@ pub extern "C" fn pl_lazy_sort(
             vec![expr_ctx.inner], 
             options
         );
+        
+        Ok(Box::into_raw(Box::new(LazyFrameContext { inner: new_lf })))
+    })
+}
+// ==========================================
+// GroupBy
+// ==========================================
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_lazy_groupby_agg(
+    lf_ptr: *mut LazyFrameContext,
+    keys_ptr: *const *mut ExprContext, keys_len: usize,
+    aggs_ptr: *const *mut ExprContext, aggs_len: usize
+) -> *mut LazyFrameContext {
+    ffi_try!({
+        let lf_ctx = unsafe { Box::from_raw(lf_ptr) };
+        let keys = unsafe { consume_exprs_array(keys_ptr, keys_len) };
+        let aggs = unsafe { consume_exprs_array(aggs_ptr, aggs_len) };
+
+        // 链式调用
+        let new_lf = lf_ctx.inner.group_by(keys).agg(aggs);
         
         Ok(Box::into_raw(Box::new(LazyFrameContext { inner: new_lf })))
     })

@@ -81,7 +81,12 @@ public static partial class PolarsWrapper
         var rPtrs = HandlesToPtrs(rightOn);
         return ErrorHelper.Check(NativeBindings.pl_join(left, right, lPtrs, (UIntPtr)lPtrs.Length, rPtrs, (UIntPtr)rPtrs.Length, how));
     }
-
+    public static DataFrameHandle Sort(DataFrameHandle df, ExprHandle expr, bool descending)
+    {
+        var h = NativeBindings.pl_sort(df, expr, descending);
+        expr.SetHandleAsInvalid(); // 消耗 Expr
+        return ErrorHelper.Check(h);
+    }
     // GroupBy 封装
     public static DataFrameHandle GroupByAgg(DataFrameHandle df, ExprHandle[] by, ExprHandle[] agg)
     {
