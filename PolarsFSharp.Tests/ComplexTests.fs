@@ -58,25 +58,67 @@ type ``Complex Query Tests`` () =
 
     [<Fact>]
     member _.``Complex Transformation (Selector Exclude)`` () =
-        use csv = new TempCsv("name,weight,height,ignore_me\nZhang,70,1.75,999")
+        let csvContent = 
+            "name,birthdate,weight,height\n" +
+            "Zhang San,1985-01-01,70.1234,1.755\n" +
+            "Li Si,1988-05-20,60.5678,1.604\n" +
+            "Wang Wu,1996-12-31,80.9999,1.859"
+        use csv = new TempCsv(csvContent)
         let lf = Polars.scanCsv csv.Path None
 
         let res = 
             lf
-            |> Polars.withColumn (
+            |> Polars.withColumns (
                 // 1. String Split -> List -> First
-                // "Zhang San" -> ["Zhang", "San"] -> "Zhang"
-                (Polars.col "name").Str.Split(" ").List.First().Alias("first_name")
-            )
+                [
+                (Polars.col "name").Str.Split(" ").List.First()
+                (Polars.col "birthdate").Dt.Year() / Polars.lit 10 * Polars.lit 10 |> Polars.alias "decade"
+            ])
             |> Polars.selectLazy [
                 // 2. Exclude (all except "ignore_me")
-                Polars.all() |> Polars.exclude ["ignore_me"] |> Polars.asExpr
+                Polars.all() |> Polars.exclude ["birthdate"] |> Polars.asExpr
             ]
-            |> Polars.withColumns [
-                // 3. Round & Prefix
-                // 对 weight 四舍五入并加前缀
-                (Polars.col "weight").Round(2).Name.Prefix("avg_")
-            ]
+            |> Polars.groupByLazy 
+                // Keys
+                [ Polars.col "decade" ] 
+                // Aggs
+                [
+                    // Agg A: 名字列表 (Polars 默认行为：非 Key 列在 agg 中会聚合成 List)
+                    // 但 Rust 原例写的是 col("name")，如果 context 是 agg，它就是 list
+                    // 这里我们显式一点，或者直接传 col "name" 让 Polars 处理
+                    Polars.col "name"
+                    // Agg B: Weight & Height 的均值 + 四舍五入 + 重命名
+                    // Rust 原例: cols(["weight", "height"]).mean().round(2).prefix("avg_")
+                    // F# 复刻: 展开写两个 Expr (效果等价)
+                    (Polars.col "weight").Mean().Round(2).Name.Prefix("avg_")
+                    (Polars.col "height").Mean().Round(2).Name.Prefix("avg_")
+                ]
             |> Polars.collect
+            |> Polars.sort (Polars.col "decade") false
 
-        Assert.DoesNotContain("ignore_me", res.ColumnNames)
+    // 验证列名 (birthdate 应该没了，新增了 decade 和 avg_ 前缀)
+        let cols = res.ColumnNames
+        Assert.DoesNotContain("birthdate", cols)
+        Assert.Contains("decade", cols)
+        Assert.Contains("avg_weight", cols)
+        Assert.Contains("avg_height", cols)
+
+        // 验证 Row 0 (1980年代: Zhang, Li)
+        Assert.Equal(1980L, res.Int("decade", 0).Value)
+        
+        // 验证数学运算 (Mean + Round)
+        // Weight: (70.1234 + 60.5678) / 2 = 65.3456 -> Round(2) -> 65.35
+        let w80 = res.Float("avg_weight", 0).Value
+        Assert.Equal(65.35, w80)
+
+        // 验证字符串处理
+        // 在 GroupBy 结果中，"name" 列变成了 List<String>
+        // 但目前我们的 C# Wrapper 转 Arrow 时，List 列会变成 String (JSON representation) 或者 ListArray
+        // 这里我们可以简单验证一下 ToArrow 的行为，或者只验证 Schema
+        // (由于我们还没做 List 类型的读取 API，这里暂时跳过内容验证，只要不崩就行)
+        
+        // 验证 Row 1 (1990年代: Wang)
+        Assert.Equal(1990L, res.Int("decade", 1).Value)
+        // Weight: 80.9999 -> 81.00
+        let w90 = res.Float("avg_weight", 1).Value
+        Assert.Equal(81.00, w90)
