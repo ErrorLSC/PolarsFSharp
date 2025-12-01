@@ -94,7 +94,31 @@ type Expr(handle: ExprHandle) =
     member this.Dt = new DtOps(handle)
     member this.Str = new StringOps(this.CloneHandle())
 and DtOps(handle: ExprHandle) =
-    member _.Year() = new Expr(PolarsWrapper.DtYear(handle))
+    let wrap op = new Expr(op handle)
+    member _.Year() = wrap PolarsWrapper.DtYear
+    member _.Month() = wrap PolarsWrapper.DtMonth
+    member _.Day() = wrap PolarsWrapper.DtDay
+    member _.Hour() = wrap PolarsWrapper.DtHour
+    member _.Minute() = wrap PolarsWrapper.DtMinute
+    member _.Second() = wrap PolarsWrapper.DtSecond
+    member _.Millisecond() = wrap PolarsWrapper.DtMillisecond
+    member _.Microsecond() = wrap PolarsWrapper.DtMicrosecond
+    member _.Nanosecond() = wrap PolarsWrapper.DtNanosecond
+    member _.OrdinalDay() = wrap PolarsWrapper.DtOrdinalDay
+    member _.Weekday() = wrap PolarsWrapper.DtWeekday
+    member _.Date() = wrap PolarsWrapper.DtDate
+    member _.Time() = wrap PolarsWrapper.DtTime
+
+    // 1. 指定格式转换
+    // 用法: col("date").Dt.ToString("%Y-%m-%d")
+    member _.ToString(format: string) = 
+        new Expr(PolarsWrapper.DtToString(handle, format)) // 注意这里 handle 是 Clone 进来的，Wrapper 会消耗它
+
+    // 2. [重载] 默认格式转换 (ISO 8601)
+    // 用法: col("date").Dt.ToString()
+    member this.ToString() = 
+        // 这是一个常见的 ISO 格式，或者你可以选择其他默认值
+        this.ToString("%Y-%m-%dT%H:%M:%S%.f")
 and StringOps(handle: ExprHandle) =
     // 内部帮助函数
     let wrap op = new Expr(op handle)

@@ -192,3 +192,62 @@ type ``String Logic Tests`` () =
         // 验证 Alice 的 Sqrt: sqrt(1.65) = 1.2845...
         let aliceSqrt = res.Float("sqrt_h", 0).Value
         Assert.True(aliceSqrt > 1.28 && aliceSqrt < 1.29)
+
+    [<Fact>]
+    member _.``Temporal Ops (Components, Format, Cast)`` () =
+        // 构造数据: 包含日期和时间的字符串
+        // Row 0: 2023年圣诞节下午3点半 (周一)
+        // Row 1: 2024年元旦零点 (周一)
+        let csvContent = "ts\n2023-12-25 15:30:00\n2024-01-01 00:00:00"
+        use csv = new TempCsv(csvContent)
+        
+        // [关键] 开启 tryParseDates=true，让 Polars 自动解析为 Datetime 类型
+        let df = Polars.readCsv csv.Path (Some true)
+
+        let res =
+            df
+            |> Polars.select [
+                Polars.col "ts"
+
+                // 1. 提取组件 (Components)
+                (Polars.col "ts").Dt.Year().Alias("y")
+                (Polars.col "ts").Dt.Month().Alias("m")
+                (Polars.col "ts").Dt.Day().Alias("d")
+                (Polars.col "ts").Dt.Hour().Alias("h")
+                
+                // Polars 定义: Monday=1, Sunday=7
+                (Polars.col "ts").Dt.Weekday().Alias("w_day")
+                
+                // 2. 格式化 (Format to String)
+                // 测试自定义格式: "2023/12/25"
+                (Polars.col "ts").Dt.ToString("%Y/%m/%d").Alias("fmt_custom")
+                
+                // 3. 类型转换 (Cast to Date)
+                // Datetime (含时分秒) -> Date (只含日期)
+                (Polars.col "ts").Dt.Date().Alias("date_only")
+            ]
+        // --- 验证 Row 0: 2023-12-25 15:30:00 ---
+        
+        // 年月日
+        Assert.Equal(2023L, res.Int("y", 0).Value)
+        Assert.Equal(12L, res.Int("m", 0).Value)
+        Assert.Equal(25L, res.Int("d", 0).Value)
+        
+        // 小时
+        Assert.Equal(15L, res.Int("h", 0).Value)
+        
+        // 星期 (2023-12-25 是周一)
+        Assert.Equal(1L, res.Int("w_day", 0).Value)
+
+        // 格式化字符串验证
+        Assert.Equal("2023/12/25", res.String("fmt_custom", 0).Value)
+
+        // Date 类型验证
+        // 我们的 formatValue 辅助函数会将 Date32 渲染为 "yyyy-MM-dd"
+        // 如果转换成功，时分秒应该消失
+        Assert.Equal("2023-12-25", res.String("date_only", 0).Value)
+
+        // --- 验证 Row 1: 2024-01-01 00:00:00 ---
+        Assert.Equal(2024L, res.Int("y", 1).Value)
+        Assert.Equal(1L, res.Int("m", 1).Value)
+        Assert.Equal(0L, res.Int("h", 1).Value) // 零点

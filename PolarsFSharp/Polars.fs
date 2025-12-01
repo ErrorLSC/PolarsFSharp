@@ -5,6 +5,7 @@ open Apache.Arrow
 open Polars.Native
 
 module Polars =
+    open Apache.Arrow.Types
     
     // --- 积木工厂 ---
     let col (name: string) = new Expr(PolarsWrapper.Col(name))
@@ -194,36 +195,76 @@ module Polars =
         let handles = exprs |> List.map (fun e -> e.CloneHandle()) |> List.toArray
         new Expr(PolarsWrapper.AsStruct(handles))
     // --- Show / Helper ---
-    // 为了保持文件整洁，formatValue 可以设为 private
-    let private formatValue (col: IArrowArray) (index: int) : string =
-        if col.IsNull(index) then "(null)"
+
+    let rec private formatValue (col: IArrowArray) (index: int) : string =
+        if col.IsNull(index) then "null"
         else
             match col with
+            // --- 基础整数 ---
+            | :? Int8Array as arr -> string (arr.GetValue(index))
+            | :? Int16Array as arr -> string (arr.GetValue(index))
             | :? Int32Array as arr -> string (arr.GetValue(index))
             | :? Int64Array as arr -> string (arr.GetValue(index))
+            | :? UInt8Array as arr -> string (arr.GetValue(index))
+            | :? UInt16Array as arr -> string (arr.GetValue(index))
+            | :? UInt32Array as arr -> string (arr.GetValue(index))
+            | :? UInt64Array as arr -> string (arr.GetValue(index))
+            
+            // --- 浮点数 ---
+            | :? FloatArray as arr -> string (arr.GetValue(index))
             | :? DoubleArray as arr -> string (arr.GetValue(index))
+            
+            // --- 字符串 ---
             | :? StringArray as arr -> arr.GetString(index)
             | :? StringViewArray as arr -> arr.GetString(index)
-            | :? LargeStringArray as arr -> arr.GetString(index)
-            | :? BooleanArray as arr -> string (arr.GetValue(index))
+            | :? BooleanArray as arr -> string (arr.GetValue(index)) // True/False
+            
+            // --- 时间日期 ---
             | :? Date32Array as arr -> 
-                let v = arr.GetValue(index)
-                if v.HasValue then DateTime(1970, 1, 1).AddDays(float v.Value).ToString("yyyy-MM-dd")
-                else "(null)"
-            | :? TimestampArray as arr -> 
-                let v = arr.GetValue(index) // Nullable<long>
-                if v.HasValue then v.Value.ToString() else "(null)"
-            | _ -> sprintf "[%s]" (col.GetType().Name)
+                let v = arr.GetValue(index).Value
+                DateTime(1970, 1, 1).AddDays(float v).ToString("yyyy-MM-dd")
+            | :? TimestampArray as arr ->
+                let v = arr.GetValue(index).Value
+                // Polars 默认微秒 (us)
+                try DateTime.UnixEpoch.AddTicks(v * 10L).ToString("yyyy-MM-dd HH:mm:ss")
+                with _ -> string v
 
-    let show (rows: int) (df: DataFrame) : DataFrame =
-        // 1. 获取总行数 (零拷贝，瞬间完成)
+            // --- 嵌套类型 ---
+            | :? ListArray as arr ->
+                let start = arr.ValueOffsets.[index]
+                let end_ = arr.ValueOffsets.[index + 1]
+                let items = [ for i in start .. end_ - 1 -> formatValue arr.Values i ]
+                sprintf "[%s]" (String.Join(", ", items))
+
+            | :? LargeListArray as arr -> // Polars 默认是用这个
+                let start = int (arr.ValueOffsets.[index])
+                let end_ = int (arr.ValueOffsets.[index + 1])
+                let items = [ for i in start .. end_ - 1 -> formatValue arr.Values i ]
+                sprintf "[%s]" (String.Join(", ", items))
+
+            | :? StructArray as arr ->
+                let structType = arr.Data.DataType :?> StructType
+                let fields = 
+                    structType.Fields 
+                    |> Seq.mapi (fun i field -> 
+                        let childCol = arr.Fields.[i]
+                        sprintf "%s: %s" field.Name (formatValue childCol index)
+                    )
+                sprintf "{%s}" (String.Join(", ", fields))
+
+            | _ -> sprintf "<%s>" (col.GetType().Name)
+
+    /// <summary>
+    /// [底层实现] 显式指定显示多少行。
+    /// 会先在 Rust 侧切片 (Head)，性能安全。
+    /// </summary>
+    let showRows (rows: int) (df: DataFrame) : DataFrame =
+        // 1. 获取元数据 (零拷贝)
         let totalRows = df.Rows
-        
-        // 2. 决定实际要切多少行 (不能超过总行数)
         let n = Math.Min(int64 rows, totalRows)
         
-        // 3. 切片并转换
-        // 只有这 n 行会被拷贝
+        // 2. Rust 侧切片 (只拷贝 n 行数据到 C#)
+        // 如果 totalRows 很大，这步至关重要
         let previewDf = df |> head (int n)
         use batch = previewDf.ToArrow()
 
@@ -232,15 +273,24 @@ module Polars =
         
         for field in fields do
             let col = batch.Column(field.Name)
-            let typeName = field.DataType.Name
+            // 直接从 Schema 获取类型名，更准确
+            let typeName = field.DataType.Name 
             
             printfn "[%s: %s]" field.Name typeName
             
+            // 打印值
             for i in 0 .. batch.Length - 1 do
-                // 这里的 formatValue 就是你之前写的那个 helper
                 printfn "  %s" (formatValue col i)
+            
+            if totalRows > int64 rows then
+                printfn "  ..."
         
         printfn "--------------------------------------------"
-        
-        // 返回原始 df
         df
+
+    /// <summary>
+    /// [快捷方式] 显示默认行数 (10行)。
+    /// 适合 REPL 或快速调试。
+    /// </summary>
+    let show (df: DataFrame) : DataFrame =
+        showRows 10 df

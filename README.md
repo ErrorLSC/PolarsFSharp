@@ -25,5 +25,5 @@ let df =
     |> Polars.filter (Polars.col "age" .> Polars.lit 18)
     |> Polars.collect
 
-df |> Polars.show 10
+df |> Polars.show
 ```

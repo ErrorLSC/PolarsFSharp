@@ -19,6 +19,8 @@ public static partial class PolarsWrapper
     }
     private static ExprHandle UnaryStrOp(Func<ExprHandle, ExprHandle> op, ExprHandle expr) 
     => UnaryOp(op, expr);
+    private static ExprHandle UnaryDtOp(Func<ExprHandle, ExprHandle> op, ExprHandle expr) 
+        => UnaryOp(op, expr);
     // --- Expr Ops (工厂方法) ---
     // 这些方法返回新的 ExprHandle，所有权在 C# 这边，直到传给 Filter/Select
     // Leaf Nodes (不消耗其他 Expr)
@@ -46,7 +48,28 @@ public static partial class PolarsWrapper
     public static ExprHandle Max(ExprHandle e) => UnaryOp(NativeBindings.pl_expr_max, e);
     public static ExprHandle Min(ExprHandle e) => UnaryOp(NativeBindings.pl_expr_min, e);
     public static ExprHandle Abs(ExprHandle e) => UnaryOp(NativeBindings.pl_expr_abs, e);
+    // Temporal
     public static ExprHandle DtYear(ExprHandle e) => UnaryOp(NativeBindings.pl_expr_dt_year, e);
+    public static ExprHandle DtMonth(ExprHandle e) => UnaryDtOp(NativeBindings.pl_expr_dt_month, e);
+    public static ExprHandle DtDay(ExprHandle e) => UnaryDtOp(NativeBindings.pl_expr_dt_day, e);
+    public static ExprHandle DtOrdinalDay(ExprHandle e) => UnaryDtOp(NativeBindings.pl_expr_dt_ordinal_day, e);
+    public static ExprHandle DtWeekday(ExprHandle e) => UnaryDtOp(NativeBindings.pl_expr_dt_weekday, e);
+    public static ExprHandle DtHour(ExprHandle e) => UnaryDtOp(NativeBindings.pl_expr_dt_hour, e);
+    public static ExprHandle DtMinute(ExprHandle e) => UnaryDtOp(NativeBindings.pl_expr_dt_minute, e);
+    public static ExprHandle DtSecond(ExprHandle e) => UnaryDtOp(NativeBindings.pl_expr_dt_second, e);
+    public static ExprHandle DtMillisecond(ExprHandle e) => UnaryDtOp(NativeBindings.pl_expr_dt_millisecond, e);
+    public static ExprHandle DtMicrosecond(ExprHandle e) => UnaryDtOp(NativeBindings.pl_expr_dt_microsecond, e);
+    public static ExprHandle DtNanosecond(ExprHandle e) => UnaryDtOp(NativeBindings.pl_expr_dt_nanosecond, e);
+    
+    public static ExprHandle DtToString(ExprHandle e, string format)
+    {
+        var h = NativeBindings.pl_expr_dt_to_string(e, format);
+        e.TransferOwnership();
+        return ErrorHelper.Check(h);
+    }
+
+    public static ExprHandle DtDate(ExprHandle e) => UnaryDtOp(NativeBindings.pl_expr_dt_date, e);
+    public static ExprHandle DtTime(ExprHandle e) => UnaryDtOp(NativeBindings.pl_expr_dt_time, e);
     // String Ops
     public static ExprHandle StrContains(ExprHandle e, string pat) 
     {

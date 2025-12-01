@@ -300,10 +300,16 @@ pub extern "C" fn pl_dataframe_get_string(
     
     match ctx.df.column(col_name) {
         Ok(col) => match col.get(row_index) {
+            // 1. 本身就是字符串，直接返回
             Ok(AnyValue::String(s)) => CString::new(s).unwrap().into_raw(),
-            // 0.50+ StringView
             Ok(AnyValue::StringOwned(s)) => CString::new(s.as_str()).unwrap().into_raw(),
-            _ => std::ptr::null_mut()
+            
+            // 2. [关键修复] 其他类型 (如 Date, Int, Float)，调用 to_string()
+            // Polars 的 AnyValue 实现了 Display，会自动格式化 Date 为 "2023-12-25" 格式
+            Ok(v) => CString::new(v.to_string()).unwrap().into_raw(),
+            
+            // 3. 只有真正的获取失败才返回 null
+            Err(_) => std::ptr::null_mut()
         },
         Err(_) => std::ptr::null_mut()
     }

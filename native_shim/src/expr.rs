@@ -152,6 +152,18 @@ gen_binary_op!(pl_expr_pow,pow);
 // dt 命名空间
 gen_namespace_unary!(pl_expr_dt_year, dt, year);
 gen_namespace_unary!(pl_expr_dt_month, dt, month);
+gen_namespace_unary!(pl_expr_dt_day, dt, day);
+gen_namespace_unary!(pl_expr_dt_ordinal_day, dt, ordinal_day);
+gen_namespace_unary!(pl_expr_dt_weekday, dt, weekday);
+gen_namespace_unary!(pl_expr_dt_hour, dt, hour);
+gen_namespace_unary!(pl_expr_dt_minute, dt, minute);
+gen_namespace_unary!(pl_expr_dt_second, dt, second);
+gen_namespace_unary!(pl_expr_dt_millisecond, dt, millisecond);
+gen_namespace_unary!(pl_expr_dt_microsecond, dt, microsecond);
+gen_namespace_unary!(pl_expr_dt_nanosecond, dt, nanosecond);
+
+gen_namespace_unary!(pl_expr_dt_date, dt, date); // 转为 Date 类型
+gen_namespace_unary!(pl_expr_dt_time, dt, time); // 转为 Time 类型
 // String Namespace
 gen_namespace_unary!(pl_expr_str_to_uppercase, str, to_uppercase);
 gen_namespace_unary!(pl_expr_str_to_lowercase, str, to_lowercase);
@@ -252,6 +264,25 @@ pub extern "C" fn pl_expr_clone(ptr: *mut ExprContext) -> *mut ExprContext {
     let new_expr = ctx.inner.clone();
     Box::into_raw(Box::new(ExprContext { inner: new_expr }))
 }
+// ==========================================
+// Date Ops
+// ==========================================
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_expr_dt_to_string(
+    expr_ptr: *mut ExprContext,
+    format_ptr: *const c_char // 必须传入格式字符串，如 "%Y-%m-%d"
+) -> *mut ExprContext {
+    ffi_try!({
+        let ctx = unsafe { Box::from_raw(expr_ptr) };
+        let format = ptr_to_str(format_ptr).unwrap();
+        
+        // Polars API: dt().to_string(format)
+        let new_expr = ctx.inner.dt().to_string(format);
+        
+        Ok(Box::into_raw(Box::new(ExprContext { inner: new_expr })))
+    })
+}
+
 // ==========================================
 // Intervals
 // ==========================================

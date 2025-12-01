@@ -128,10 +128,24 @@ unsafe internal partial class NativeBindings
 
     [DllImport(LibName)]
     public static extern DataFrameHandle pl_select(DataFrameHandle df, IntPtr[] exprs, UIntPtr len);
-
+    // Temporal
     [DllImport(LibName)] 
     public static extern ExprHandle pl_expr_dt_year(ExprHandle expr);
-
+    [DllImport(LibName)] public static extern ExprHandle pl_expr_dt_month(ExprHandle expr);
+    [DllImport(LibName)] public static extern ExprHandle pl_expr_dt_day(ExprHandle expr);
+    [DllImport(LibName)] public static extern ExprHandle pl_expr_dt_ordinal_day(ExprHandle expr);
+    [DllImport(LibName)] public static extern ExprHandle pl_expr_dt_weekday(ExprHandle expr);
+    [DllImport(LibName)] public static extern ExprHandle pl_expr_dt_hour(ExprHandle expr);
+    [DllImport(LibName)] public static extern ExprHandle pl_expr_dt_minute(ExprHandle expr);
+    [DllImport(LibName)] public static extern ExprHandle pl_expr_dt_second(ExprHandle expr);
+    [DllImport(LibName)] public static extern ExprHandle pl_expr_dt_millisecond(ExprHandle expr);
+    [DllImport(LibName)] public static extern ExprHandle pl_expr_dt_microsecond(ExprHandle expr);
+    [DllImport(LibName)] public static extern ExprHandle pl_expr_dt_nanosecond(ExprHandle expr);
+    [DllImport(LibName)] 
+    public static extern ExprHandle pl_expr_dt_to_string(ExprHandle expr, [MarshalAs(UnmanagedType.LPUTF8Str)] string format);
+    
+    [DllImport(LibName)] public static extern ExprHandle pl_expr_dt_date(ExprHandle expr);
+    [DllImport(LibName)] public static extern ExprHandle pl_expr_dt_time(ExprHandle expr);
     [DllImport(LibName)]
     public static extern ExprHandle pl_expr_clone(ExprHandle expr);
 
