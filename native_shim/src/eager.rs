@@ -1,7 +1,20 @@
 use polars::prelude::*;
 use std::{ffi::CString, os::raw::c_char};
 use crate::types::*;
+// ==========================================
+// 0. Memory Safety
+// ==========================================
 
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_dataframe_free(ptr: *mut DataFrameContext) {
+    ffi_try_void!({
+        if !ptr.is_null() {
+        // 拿回所有权，离开作用域时自动 Drop (释放内存)
+        unsafe { let _ = Box::from_raw(ptr); }
+        }
+        Ok(())
+    })
+}
 // ==========================================
 // 1. 内部辅助函数 (消灭重复的 unsafe 循环)
 // ==========================================

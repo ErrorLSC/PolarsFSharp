@@ -36,7 +36,7 @@ public class DataFrameHandle : PolarsHandle
 {
     protected override bool ReleaseHandle()
     {
-        NativeBindings.pl_free_dataframe(handle);
+        NativeBindings.pl_dataframe_free(handle);
         return true;
     }
 }

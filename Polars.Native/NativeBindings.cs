@@ -27,7 +27,7 @@ unsafe internal partial class NativeBindings
     bool tryParseDates
     );
     [DllImport(LibName)]
-    public static extern void pl_free_dataframe(IntPtr ptr);
+    public static extern void pl_dataframe_free(IntPtr ptr);
     // String Free
     [DllImport(LibName)] public static extern void pl_free_string(IntPtr ptr);
     [DllImport(LibName)] public static extern void pl_to_arrow(DataFrameHandle handle, CArrowArray* arr, CArrowSchema* schema);
