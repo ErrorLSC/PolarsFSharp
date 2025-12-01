@@ -59,6 +59,13 @@ public static partial class PolarsWrapper
         lf.TransferOwnership();
         return ErrorHelper.Check(h);
     }
+    public static LazyFrameHandle LazyExplode(LazyFrameHandle lf, ExprHandle[] exprs)
+    {
+        var raw = HandlesToPtrs(exprs);
+        var newLf = NativeBindings.pl_lazy_explode(lf, raw, (UIntPtr)raw.Length);
+        lf.TransferOwnership(); // 链式调用消耗旧 LF
+        return ErrorHelper.Check(newLf);
+    }
     // --- Clone Ops ---
     public static LazyFrameHandle CloneLazy(LazyFrameHandle lf)
     {

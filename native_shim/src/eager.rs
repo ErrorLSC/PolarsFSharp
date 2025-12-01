@@ -90,7 +90,6 @@ gen_eager_op_single!(pl_filter, filter);
 
 // 生成 pl_select
 gen_eager_op_vec!(pl_select, select);
-
 // pl_with_columns
 gen_eager_op_vec!(pl_with_columns, with_columns);
 
@@ -331,6 +330,49 @@ pub extern "C" fn pl_head(df_ptr: *mut DataFrameContext, n: usize) -> *mut DataF
         let ctx = unsafe { &*df_ptr };
         // head 只是切片，开销极小
         let res_df = ctx.df.head(Some(n));
+        Ok(Box::into_raw(Box::new(DataFrameContext { df: res_df })))
+    })
+}
+// ==========================================
+// Explode
+// ==========================================
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_explode(
+    df_ptr: *mut DataFrameContext,
+    exprs_ptr: *const *mut ExprContext,
+    len: usize
+) -> *mut DataFrameContext {
+    ffi_try!({
+        let ctx = unsafe { &*df_ptr };
+        let exprs = unsafe { consume_exprs_array(exprs_ptr, len) };
+
+        if exprs.is_empty() {
+             let res_df = ctx.df.clone();
+             return Ok(Box::into_raw(Box::new(DataFrameContext { df: res_df })));
+        }
+
+        let mut iter = exprs.into_iter();
+        
+        // 1. 处理第一个
+        let first_expr = iter.next().unwrap();
+        // [修复] 安全解包
+        let mut final_selector = first_expr.into_selector()
+            .ok_or_else(|| PolarsError::ComputeError("Expr cannot be converted to Selector".into()))?;
+
+        // 2. 处理剩下的
+        for e in iter {
+            let s = e.into_selector()
+                .ok_or_else(|| PolarsError::ComputeError("Expr cannot be converted to Selector".into()))?;
+                
+            final_selector = final_selector | s;
+        }
+
+        // 转 Lazy -> explode -> collect
+        let res_df = ctx.df.clone()
+            .lazy()
+            .explode(final_selector)
+            .collect()?;
+
         Ok(Box::into_raw(Box::new(DataFrameContext { df: res_df })))
     })
 }

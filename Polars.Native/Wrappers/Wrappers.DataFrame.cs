@@ -95,6 +95,11 @@ public static partial class PolarsWrapper
         expr.TransferOwnership();// 消耗 Expr
         return ErrorHelper.Check(h);
     }
+    public static DataFrameHandle Explode(DataFrameHandle df, ExprHandle[] exprs)
+    {
+        var raw = HandlesToPtrs(exprs);
+        return ErrorHelper.Check(NativeBindings.pl_explode(df, raw, (UIntPtr)raw.Length));
+    }
     // GroupBy 封装
     public static DataFrameHandle GroupByAgg(DataFrameHandle df, ExprHandle[] by, ExprHandle[] agg)
     {

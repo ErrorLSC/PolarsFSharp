@@ -80,6 +80,8 @@ type Expr(handle: ExprHandle) =
     // --- Namespaces ---
     member this.Name = new NameOps(this.CloneHandle())
     member this.List = new ListOps(this.CloneHandle())
+    // Explode
+    member this.Explode() = new Expr(PolarsWrapper.Explode(this.CloneHandle()))
     // IsBetween
     member this.IsBetween(lower: Expr, upper: Expr) =
         new Expr(PolarsWrapper.IsBetween(this.CloneHandle(), lower.CloneHandle(), upper.CloneHandle()))
@@ -124,6 +126,8 @@ and NameOps(handle: ExprHandle) =
 and ListOps(handle: ExprHandle) =
     member _.First() = new Expr(PolarsWrapper.ListFirst(handle))
     member _.Get(index: int) = new Expr(PolarsWrapper.ListGet(handle, int64 index))
+    member _.Join(separator: string) = new Expr(PolarsWrapper.ListJoin(handle, separator))
+    member _.Len() = new Expr(PolarsWrapper.ListLen(handle))
 
 type Selector(handle: SelectorHandle) =
     member _.Handle = handle
@@ -173,6 +177,47 @@ type DataFrame(handle: DataFrameHandle) =
         let nullableVal = PolarsWrapper.GetDouble(handle, colName, int64 rowIndex)
         if nullableVal.HasValue then Some nullableVal.Value else None
     member this.String(colName: string, rowIndex: int) = PolarsWrapper.GetString(handle, colName, int64 rowIndex) |> Option.ofObj
+
+    member this.StringList(colName: string, rowIndex: int) : string list option =
+        // 1. 获取该列的 Arrow Array
+        use colHandle = PolarsWrapper.Select(handle, [| PolarsWrapper.Col(colName) |])
+        use tempDf = new DataFrame(colHandle)
+        use arrowBatch = tempDf.ToArrow()
+        
+        let col = arrowBatch.Column(colName)
+        
+        // 内部辅助函数：从 Values 数组中提取字符串
+        let extractStrings (valuesArr: IArrowArray) (startIdx: int) (endIdx: int) =
+            match valuesArr with
+            | :? StringArray as sa ->
+                [ for i in startIdx .. endIdx - 1 -> sa.GetString(i) ]
+            | :? StringViewArray as sva ->
+                [ for i in startIdx .. endIdx - 1 -> sva.GetString(i) ]
+            | _ -> [] // 类型不匹配
+
+        // 2. 解析 ListArray 或 LargeListArray
+        match col with
+        // Case A: 标准 List (32-bit offsets)
+        | :? Apache.Arrow.ListArray as listArr ->
+            if listArr.IsNull(rowIndex) then None
+            else
+                let start = listArr.ValueOffsets.[rowIndex]
+                let end_ = listArr.ValueOffsets.[rowIndex + 1]
+                Some (extractStrings listArr.Values start end_)
+
+        // Case B: [关键修复] Large List (64-bit offsets) - Polars 通常输出这个
+        | :? Apache.Arrow.LargeListArray as listArr ->
+            if listArr.IsNull(rowIndex) then None
+            else
+                // Offset 是 long，强转 int (单行 List 长度通常不会超过 20 亿)
+                let start = int (listArr.ValueOffsets.[rowIndex])
+                let end_ = int (listArr.ValueOffsets.[rowIndex + 1])
+                Some (extractStrings listArr.Values start end_)
+
+        | _ -> 
+            // 调试信息：如果未来 Polars 改用 ListViewArray，这里能看出来
+            // System.Console.WriteLine($"[Debug] Mismatched Array Type: {col.GetType().Name}")
+            None
 
 // LazyFrame 封装
 // 它依赖 DataFrame (Collect 返回 DataFrame)，所以必须定义在 DataFrame 后面

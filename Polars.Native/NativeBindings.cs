@@ -34,6 +34,8 @@ unsafe internal partial class NativeBindings
 
     [DllImport(LibName)]
     public static extern ExprHandle pl_expr_col([MarshalAs(UnmanagedType.LPUTF8Str)] string name);
+    [DllImport(LibName)] 
+    public static extern ExprHandle pl_expr_cols(IntPtr[] names, UIntPtr len);
 
     [DllImport(LibName)]
     public static extern ExprHandle pl_expr_lit_i32(int val);
@@ -160,6 +162,8 @@ unsafe internal partial class NativeBindings
     );
     [DllImport(LibName)] 
     public static extern DataFrameHandle pl_sort(DataFrameHandle df, ExprHandle expr, bool descending);
+    [DllImport(LibName)] 
+    public static extern DataFrameHandle pl_explode(DataFrameHandle df, IntPtr[] exprs, UIntPtr len);
     // Parquet
     [DllImport(LibName)] 
     public static extern void pl_write_csv(DataFrameHandle df, [MarshalAs(UnmanagedType.LPUTF8Str)] string path);
@@ -196,7 +200,8 @@ unsafe internal partial class NativeBindings
 
     [DllImport(LibName)] public static extern LazyFrameHandle pl_lazy_limit(LazyFrameHandle lf, uint n);
     [DllImport(LibName)] public static extern LazyFrameHandle pl_lazy_with_columns(LazyFrameHandle lf, IntPtr[] exprs, UIntPtr len);
-
+    [DllImport(LibName)] 
+    public static extern LazyFrameHandle pl_lazy_explode(LazyFrameHandle lf, IntPtr[] exprs, UIntPtr len);
     // String Ops
     [DllImport(LibName)] public static extern ExprHandle pl_expr_str_contains(ExprHandle expr, [MarshalAs(UnmanagedType.LPUTF8Str)] string pat);
 
@@ -218,6 +223,9 @@ unsafe internal partial class NativeBindings
     // List Ops
     [DllImport(LibName)] public static extern ExprHandle pl_expr_list_first(ExprHandle expr);
     [DllImport(LibName)] public static extern ExprHandle pl_expr_list_get(ExprHandle expr, long index);
+    [DllImport(LibName)] public static extern ExprHandle pl_expr_explode(ExprHandle expr);
+    [DllImport(LibName)] public static extern ExprHandle pl_expr_list_join(ExprHandle expr, [MarshalAs(UnmanagedType.LPUTF8Str)] string sep);
+    [DllImport(LibName)] public static extern ExprHandle pl_expr_list_len(ExprHandle expr);
     // Naming
     [DllImport(LibName)] public static extern ExprHandle pl_expr_prefix(ExprHandle expr, [MarshalAs(UnmanagedType.LPUTF8Str)] string prefix);
     [DllImport(LibName)] public static extern ExprHandle pl_expr_suffix(ExprHandle expr, [MarshalAs(UnmanagedType.LPUTF8Str)] string suffix);

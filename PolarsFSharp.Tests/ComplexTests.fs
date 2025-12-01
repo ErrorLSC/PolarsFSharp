@@ -122,3 +122,54 @@ type ``Complex Query Tests`` () =
         // Weight: 80.9999 -> 81.00
         let w90 = res.Float("avg_weight", 1).Value
         Assert.Equal(81.00, w90)
+
+    [<Fact>]
+    member _.``List Ops: Cols, Explode, Join and Read`` () =
+        // 数据: 一个人有多个 Tag (空格分隔)
+        use csv = new TempCsv("name,tags\nAlice,coding reading\nBob,gaming")
+        let lf = Polars.scanCsv csv.Path None
+
+        let res = 
+            lf
+            |> Polars.withColumn (
+                // 1. Split 变成 List
+                (Polars.col "tags").Str.Split(" ").Alias("tag_list")
+            )
+            |> Polars.withColumn (
+                // 2. 演示 cols([...]): 同时选中 name 和 tag_list，加上前缀
+                // 虽然这里只是演示，通常用于批量数学运算
+                Polars.cols ["name"; "tag_list"]
+                |> fun e -> e.Name.Prefix("my_")
+            )
+            |> Polars.withColumn (
+                // 3. List Join (还原回去)
+                (Polars.col "my_tag_list").List.Join("-").Alias("joined_tags")
+            )
+            |> Polars.collect
+
+        // 验证 1: cols 产生的前缀
+        let cols = res.ColumnNames
+        Assert.Contains("my_name", cols)
+        Assert.Contains("my_tag_list", cols)
+
+        // 验证 2: List Join
+        // coding reading -> coding-reading
+        Assert.Equal("coding-reading", res.String("joined_tags", 0).Value)
+
+        // 验证 3: 读取 List (使用新加的 API)
+        let aliceTags = res.StringList("my_tag_list", 0)
+        Assert.True aliceTags.IsSome
+        Assert.Equal<string list>(["coding"; "reading"], aliceTags.Value)
+
+        // 验证 4: Explode (炸裂)
+        // Alice 有 2 个 tag，Bob 有 1 个 -> Explode 后应该是 3 行
+        let exploded = 
+            res 
+            |> Polars.select [ Polars.col "my_name"; Polars.col "my_tag_list" ]
+            // [修改] 加上列表括号 []
+            |> Polars.explode [ Polars.col "my_tag_list" ] 
+        
+        Assert.Equal(3L, exploded.Rows)
+        Assert.Equal("coding", exploded.String("my_tag_list", 0).Value)
+        Assert.Equal("reading", exploded.String("my_tag_list", 1).Value)
+        Assert.Equal("gaming", exploded.String("my_tag_list", 2).Value)

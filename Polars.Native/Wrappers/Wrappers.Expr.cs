@@ -23,6 +23,13 @@ public static partial class PolarsWrapper
     // 这些方法返回新的 ExprHandle，所有权在 C# 这边，直到传给 Filter/Select
     // Leaf Nodes (不消耗其他 Expr)
     public static ExprHandle Col(string name) => ErrorHelper.Check(NativeBindings.pl_expr_col(name));
+    public static ExprHandle Cols(string[] names)
+    {
+        return UseUtf8StringArray(names, ptrs => 
+        {
+            return ErrorHelper.Check(NativeBindings.pl_expr_cols(ptrs, (UIntPtr)ptrs.Length));
+        });
+    }
     public static ExprHandle Lit(int val) => ErrorHelper.Check(NativeBindings.pl_expr_lit_i32(val));
     public static ExprHandle Lit(string val) => ErrorHelper.Check(NativeBindings.pl_expr_lit_str(val));
     public static ExprHandle Lit(double val) => ErrorHelper.Check(NativeBindings.pl_expr_lit_f64(val));
@@ -148,6 +155,16 @@ public static partial class PolarsWrapper
         return ErrorHelper.Check(h);
     }
 
+    public static ExprHandle Explode(ExprHandle e) => UnaryOp(NativeBindings.pl_expr_explode, e);
+    
+    public static ExprHandle ListJoin(ExprHandle e, string sep)
+    {
+        var h = NativeBindings.pl_expr_list_join(e, sep);
+        e.TransferOwnership(); // [关键] 必须转移所有权
+        return ErrorHelper.Check(h);
+    }
+
+    public static ExprHandle ListLen(ExprHandle e) => UnaryOp(NativeBindings.pl_expr_list_len, e);
     // Naming
     public static ExprHandle Prefix(ExprHandle e, string p)
     {

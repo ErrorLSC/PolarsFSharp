@@ -1,6 +1,5 @@
 use polars::prelude::*;
 use crate::types::*;
-
 // ==========================================
 // 1. 内部辅助函数
 // ==========================================
@@ -148,6 +147,43 @@ pub extern "C" fn pl_lazy_groupby_agg(
         Ok(Box::into_raw(Box::new(LazyFrameContext { inner: new_lf })))
     })
 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_lazy_explode(
+    lf_ptr: *mut LazyFrameContext,
+    exprs_ptr: *const *mut ExprContext,
+    len: usize
+) -> *mut LazyFrameContext {
+    ffi_try!({
+        let lf_ctx = unsafe { Box::from_raw(lf_ptr) };
+        let exprs = unsafe { consume_exprs_array(exprs_ptr, len) };
+
+        if exprs.is_empty() {
+            return Ok(Box::into_raw(Box::new(LazyFrameContext { inner: lf_ctx.inner })));
+        }
+
+        let mut iter = exprs.into_iter();
+        
+        // 1. 处理第一个
+        let first_expr = iter.next().unwrap();
+        // [修复] 处理 Option: 如果转换失败，抛出错误
+        let mut final_selector = first_expr.into_selector()
+            .ok_or_else(|| PolarsError::ComputeError("Expr cannot be converted to Selector".into()))?;
+
+        // 2. 处理剩下的
+        for e in iter {
+            let s = e.into_selector()
+                .ok_or_else(|| PolarsError::ComputeError("Expr cannot be converted to Selector".into()))?;
+            
+            final_selector = final_selector | s; // Union
+        }
+
+        let new_lf = lf_ctx.inner.explode(final_selector);
+        
+        Ok(Box::into_raw(Box::new(LazyFrameContext { inner: new_lf })))
+    })
+}
+
 // ==========================================
 // Collect (出口：LazyFrame -> DataFrame)
 // ==========================================

@@ -303,6 +303,59 @@ pub extern "C" fn pl_expr_list_get(
     })
 }
 
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_expr_cols(
+    names_ptr: *const *const c_char,
+    len: usize
+) -> *mut ExprContext {
+    ffi_try!({
+        // 构造 Vec<String> (cols 接受 AsRef<str>)
+        let mut names = Vec::with_capacity(len);
+        let slice = unsafe { std::slice::from_raw_parts(names_ptr, len) };
+        for &p in slice {
+            let s = ptr_to_str(p).unwrap();
+            names.push(s);
+        }
+
+        // polars::prelude::cols
+        let selection = cols(names);
+        let new_expr = selection.into();
+        Ok(Box::into_raw(Box::new(ExprContext { inner: new_expr })))
+    })
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_expr_explode(expr_ptr: *mut ExprContext) -> *mut ExprContext {
+    ffi_try!({
+        let ctx = unsafe { Box::from_raw(expr_ptr) };
+        let new_expr = ctx.inner.explode();
+        Ok(Box::into_raw(Box::new(ExprContext { inner: new_expr })))
+    })
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_expr_list_join(
+    expr_ptr: *mut ExprContext,
+    sep_ptr: *const c_char
+) -> *mut ExprContext {
+    ffi_try!({
+        let ctx = unsafe { Box::from_raw(expr_ptr) };
+        let sep = ptr_to_str(sep_ptr).unwrap();
+        // list().join(sep, ignore_nulls=true)
+        let new_expr = ctx.inner.list().join(lit(sep), true);
+        Ok(Box::into_raw(Box::new(ExprContext { inner: new_expr })))
+    })
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_expr_list_len(expr_ptr: *mut ExprContext) -> *mut ExprContext {
+    ffi_try!({
+        let ctx = unsafe { Box::from_raw(expr_ptr) };
+        let new_expr = ctx.inner.list().len();
+        Ok(Box::into_raw(Box::new(ExprContext { inner: new_expr })))
+    })
+}
+
 // ==========================================
 // Math
 // ==========================================

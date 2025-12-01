@@ -79,7 +79,11 @@ module Polars =
         // 这里的 n 转 uint，PolarsWrapper 接收 uint
         let h = PolarsWrapper.Head(df.Handle, uint n)
         new DataFrame(h)
-
+    let explode (exprs: Expr list) (df: DataFrame) : DataFrame =
+        let handles = exprs |> List.map (fun e -> e.CloneHandle()) |> List.toArray
+        let h = PolarsWrapper.Explode(df.Handle, handles)
+        new DataFrame(h)
+        
     let sum (e: Expr) = e.Sum()
     let mean (e: Expr) = e.Mean()
     let max (e: Expr) = e.Max()
@@ -94,6 +98,13 @@ module Polars =
     let pow (exponent: Expr) (baseExpr: Expr) = baseExpr.Pow(exponent)
     let sqrt (e: Expr) = e.Sqrt()
     let exp (e: Expr) = e.Exp()
+
+    // cols(["a", "b"])
+    // 这是一个 Expr 工厂方法
+    let cols (names: string list) =
+        let arr = List.toArray names
+        new Expr(PolarsWrapper.Cols(arr))
+
     // --- Lazy API ---
     let scanCsv (path: string) (tryParseDates: bool option) = 
         let parseDates = defaultArg tryParseDates true
