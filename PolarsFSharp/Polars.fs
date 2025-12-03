@@ -212,7 +212,23 @@ module Polars =
         new LazyFrame(PolarsWrapper.LazyUnpivot(lfClone, iArr, oArr, varN, valN))
 
     let meltLazy = unpivotLazy
+    // --- Concatenation ---
 
+    // [新增] Eager Concat
+    let concat (dfs: DataFrame list) : DataFrame =
+        // 这里的 CloneHandle 是为了用户体验：用户可能不希望 concat 之后原表就废了
+        // 所以我们手动 Clone 一份传给底层去消费
+        let handles = dfs |> List.map (fun df -> df.CloneHandle()) |> List.toArray
+        
+        // 注意：Wrapper.Concat 会 SetInvalid，所以这里的 dfs 列表里的对象之后就不能用了
+        // 这是符合线性类型逻辑的。如果想支持 Copy，需要在 Rust 加 pl_dataframe_clone
+        new DataFrame(PolarsWrapper.Concat(handles))
+    let concatLazy (lfs: LazyFrame list) : LazyFrame =
+        // 同样，LazyFrame 支持 CloneHandle (我们之前加过)
+        // 这里我们可以选择自动 Clone，保持 Functional 的不可变感觉
+        let handles = lfs |> List.map (fun lf -> lf.CloneHandle()) |> List.toArray
+        
+        new LazyFrame(PolarsWrapper.LazyConcat(handles))
     // Streaming Collect
     let collectStreaming (lf: LazyFrame) : DataFrame =
         let lfClone = lf.CloneHandle()

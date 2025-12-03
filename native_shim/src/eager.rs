@@ -214,6 +214,18 @@ pub extern "C" fn pl_dataframe_get_column_name(
     CString::new(cols[index].as_str()).unwrap().into_raw()
 }
 
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_dataframe_clone(ptr: *mut DataFrameContext) -> *mut DataFrameContext {
+    ffi_try!({
+        // 1. 借用 (&*ptr) 而不是消费 (Box::from_raw)
+        let ctx = unsafe { &*ptr };
+        
+        // 2. Clone (Deep copy of the logical plan/structure, data is COW)
+        let new_df = ctx.df.clone();
+        
+        Ok(Box::into_raw(Box::new(DataFrameContext { df: new_df })))
+    })
+}
 // --- 标量获取 (Scalar Access) ---
 
 #[unsafe(no_mangle)]
@@ -486,5 +498,33 @@ pub extern "C" fn pl_unpivot(
             .collect()?;
 
         Ok(Box::into_raw(Box::new(DataFrameContext { df: res_df })))
+    })
+}
+// ==========================================
+// Concat
+// ==========================================
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_concat_vertical(
+    dfs_ptr: *const *mut DataFrameContext,
+    len: usize
+) -> *mut DataFrameContext {
+    ffi_try!({
+        let slice = unsafe { std::slice::from_raw_parts(dfs_ptr, len) };
+        if len == 0 {
+            return Ok(Box::into_raw(Box::new(DataFrameContext { df: DataFrame::default() })));
+        }
+
+        // 取出第一个作为 base
+        let base_ctx = unsafe { Box::from_raw(slice[0]) };
+        let mut base_df = base_ctx.df;
+
+        // 依次 vstack 剩下的
+        for &p in &slice[1..] {
+            let other_ctx = unsafe { Box::from_raw(p) };
+            // vstack 默认是做了垂直拼接
+            base_df.vstack_mut(&other_ctx.df)?;
+        }
+
+        Ok(Box::into_raw(Box::new(DataFrameContext { df: base_df })))
     })
 }

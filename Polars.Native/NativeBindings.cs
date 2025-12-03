@@ -62,6 +62,8 @@ unsafe internal partial class NativeBindings
         UIntPtr row, 
         out double outVal // <--- double 也是 blittable 类型，直接用
     );
+    [LibraryImport(LibName)] 
+    public static partial DataFrameHandle pl_dataframe_clone(DataFrameHandle df);
     [LibraryImport(LibName)] public static partial IntPtr pl_dataframe_get_string(DataFrameHandle df, [MarshalAs(UnmanagedType.LPUTF8Str)] string colName, UIntPtr row);
     [LibraryImport(LibName)]
     public static partial DataFrameHandle pl_head(DataFrameHandle df, UIntPtr n);
@@ -178,6 +180,11 @@ unsafe internal partial class NativeBindings
     public static partial DataFrameHandle pl_sort(DataFrameHandle df, ExprHandle expr, [MarshalAs(UnmanagedType.U1)] bool descending);
     [LibraryImport(LibName)] 
     public static partial DataFrameHandle pl_explode(DataFrameHandle df, IntPtr[] exprs, UIntPtr len);
+    [LibraryImport(LibName)] 
+    public static partial DataFrameHandle pl_concat_vertical(
+        IntPtr[] dfs, 
+        UIntPtr len
+    );
     // Parquet
     [LibraryImport(LibName)] 
     public static partial void pl_write_csv(DataFrameHandle df, [MarshalAs(UnmanagedType.LPUTF8Str)] string path);
@@ -224,7 +231,13 @@ unsafe internal partial class NativeBindings
         [MarshalAs(UnmanagedType.LPUTF8Str)] string varName,
         [MarshalAs(UnmanagedType.LPUTF8Str)] string valName
     );
-
+    [LibraryImport(LibName)] 
+    public static partial LazyFrameHandle pl_lazy_concat(
+        IntPtr[] lfs, 
+        UIntPtr len,
+        [MarshalAs(UnmanagedType.U1)] bool rechunk,
+        [MarshalAs(UnmanagedType.U1)] bool parallel
+    );
     // --- Streaming & Sink ---
     [LibraryImport(LibName)] 
     public static partial DataFrameHandle pl_lazy_collect_streaming(LazyFrameHandle lf);
@@ -288,6 +301,7 @@ unsafe internal partial class NativeBindings
         [MarshalAs(UnmanagedType.LPUTF8Str)] string varName,
         [MarshalAs(UnmanagedType.LPUTF8Str)] string valName
     );
+
     // Expr Len
     [LibraryImport(LibName)] 
     public static partial ExprHandle pl_expr_len();

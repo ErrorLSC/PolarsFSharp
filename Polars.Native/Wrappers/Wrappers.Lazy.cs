@@ -83,7 +83,12 @@ public static partial class PolarsWrapper
             })
         );
     }
-
+    public static LazyFrameHandle LazyConcat(LazyFrameHandle[] lfs, bool rechunk = false, bool parallel = true)
+    {
+        var ptrs = HandlesToPtrs(lfs); // 转移所有权
+        var h = NativeBindings.pl_lazy_concat(ptrs, (UIntPtr)ptrs.Length, rechunk, parallel);
+        return ErrorHelper.Check(h);
+    }
     // [新增] Streaming Collect
     public static DataFrameHandle CollectStreaming(LazyFrameHandle lf)
     {
@@ -91,16 +96,8 @@ public static partial class PolarsWrapper
         lf.TransferOwnership();
         return ErrorHelper.Check(df);
     }
-
-    // [新增] Sink Parquet
-    // public static void SinkParquet(LazyFrameHandle lf, string path)
-    // {
-    //     NativeBindings.pl_lazy_sink_parquet(lf, path);
-    //     lf.TransferOwnership();
-    //     ErrorHelper.CheckVoid();
-    // }
     // --- Clone Ops ---
-    public static LazyFrameHandle CloneLazy(LazyFrameHandle lf)
+    public static LazyFrameHandle LazyClone(LazyFrameHandle lf)
     {
         // 注意：这里不需要 Invalidate lf，因为 Rust 侧只是借用
         return ErrorHelper.Check(NativeBindings.pl_lazy_clone(lf));

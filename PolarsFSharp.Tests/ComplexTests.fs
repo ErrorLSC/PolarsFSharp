@@ -274,3 +274,47 @@ type ``Complex Query Tests`` () =
         Assert.Equal(3L, wideDf.Columns) // year, Q1, Q2
         Assert.Equal(100L, wideDf.Int("Q1", 0).Value)
         Assert.Equal(400L, wideDf.Int("Q2", 1).Value)
+
+    [<Fact>]
+    member _.``Lazy Concatenation: Vertical Stack`` () =
+        // DF1: 1, 2
+        use csv1 = new TempCsv("val\n1\n2")
+        // DF2: 3, 4
+        use csv2 = new TempCsv("val\n3\n4")
+
+        let lf1 = Polars.scanCsv csv1.Path None
+        let lf2 = Polars.scanCsv csv2.Path None
+
+        // 测试 Lazy Concat
+        let bigLf = Polars.concatLazy [lf1; lf2]
+        let bigDf = bigLf |> Polars.collect |> Polars.sort (Polars.col "val") false
+
+        Assert.Equal(4L, bigDf.Rows)
+        Assert.Equal(1L, bigDf.Int("val", 0).Value)
+        Assert.Equal(4L, bigDf.Int("val", 3).Value)
+
+        // 验证 lf1 依然可用 (因为 concatLazy 内部做了 CloneHandle)
+        let lf1Count = lf1 |> Polars.collect |> fun d -> d.Rows
+        Assert.Equal(2L, lf1Count)
+
+    [<Fact>]
+    member _.``Concatenation: Eager Stack (Safety Check)`` () =
+        // DF1
+        use csv1 = new TempCsv("val\n1")
+        let df1 = Polars.readCsv csv1.Path None
+        
+        // DF2
+        use csv2 = new TempCsv("val\n2")
+        let df2 = Polars.readCsv csv2.Path None
+
+        // 1. 执行 Concat
+        let bigDf = Polars.concat [df1; df2]
+
+        // 验证结果
+        Assert.Equal(2L, bigDf.Rows)
+
+        // 2. [关键验证] 验证原 df1, df2 是否依然可用
+        // 如果没有正确 Clone，这里会报 ObjectDisposedException 或 Segfault
+        Assert.Equal(1L, df1.Rows)
+        Assert.Equal(1L, df2.Rows)
+        Assert.Equal(1L, df1.Int("val", 0).Value)

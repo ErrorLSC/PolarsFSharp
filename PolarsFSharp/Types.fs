@@ -220,7 +220,8 @@ type Selector(handle: SelectorHandle) =
 type DataFrame(handle: DataFrameHandle) =
     interface IDisposable with
         member _.Dispose() = handle.Dispose()
-    
+    member this.Clone() = new DataFrame(PolarsWrapper.CloneDataFrame handle)
+    member internal this.CloneHandle() = PolarsWrapper.CloneDataFrame handle
     member _.Handle = handle
     
     // 依然保留，用于 Show 或者用户真的需要 Arrow 数据时
@@ -294,7 +295,7 @@ type DataFrame(handle: DataFrameHandle) =
 // 它依赖 DataFrame (Collect 返回 DataFrame)，所以必须定义在 DataFrame 后面
 type LazyFrame(handle: LazyFrameHandle) =
     member _.Handle = handle
-    member internal this.CloneHandle() = PolarsWrapper.CloneLazy(handle)
+    member internal this.CloneHandle() = PolarsWrapper.LazyClone(handle)
     member this.Collect() = 
         let dfHandle = PolarsWrapper.LazyCollect(handle)
         new DataFrame(dfHandle)

@@ -28,6 +28,10 @@ public static partial class PolarsWrapper
         }
         return names;
     }
+    public static DataFrameHandle CloneDataFrame(DataFrameHandle df)
+    {
+        return ErrorHelper.Check(NativeBindings.pl_dataframe_clone(df));
+    }
     // ==========================================
     // Scalar Access (标量获取 - O(1))
     // ==========================================
@@ -147,5 +151,11 @@ public static partial class PolarsWrapper
                 ));
             })
         );
+    }
+    public static DataFrameHandle Concat(DataFrameHandle[] dfs)
+    {
+        var ptrs = HandlesToPtrs(dfs); // 转移所有权
+        var h = NativeBindings.pl_concat_vertical(ptrs, (UIntPtr)ptrs.Length);
+        return ErrorHelper.Check(h);
     }
 }

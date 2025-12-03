@@ -4,7 +4,7 @@ use crate::types::*;
 use polars::lazy::dsl::UnpivotArgsDSL;
 
 // ==========================================
-// 2. 宏定义
+// 宏定义
 // ==========================================
 
 /// 模式 A: LazyFrame -> Vec<Expr> -> LazyFrame
@@ -205,7 +205,9 @@ pub extern "C" fn pl_lazy_collect_streaming(lf_ptr: *mut LazyFrameContext) -> *m
         Ok(Box::into_raw(Box::new(DataFrameContext { df })))
     })
 }
-
+// ==========================================
+// Unpivot
+// ==========================================
 #[unsafe(no_mangle)]
 pub extern "C" fn pl_lazy_unpivot(
     lf_ptr: *mut LazyFrameContext,
@@ -268,7 +270,43 @@ pub extern "C" fn pl_lazy_unpivot(
         Ok(Box::into_raw(Box::new(LazyFrameContext { inner: new_lf })))
     })
 }
+// ==========================================
+// Concat
+// ==========================================
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_lazy_concat(
+    lfs_ptr: *const *mut LazyFrameContext, // 指针数组
+    len: usize,
+    rechunk: bool,
+    parallel: bool
+) -> *mut LazyFrameContext {
+    ffi_try!({
+        // 1. 转换指针数组为 Vec<LazyFrame>
+        // 注意：这里我们需要消费掉所有的输入 LazyFrame (拿走所有权)
+        let mut lfs = Vec::with_capacity(len);
+        let slice = unsafe { std::slice::from_raw_parts(lfs_ptr, len) };
+        
+        for &p in slice {
+            // Box::from_raw 会拿回所有权，循环结束后如果不 move 就会 drop
+            // 所以我们需要把 inner 拿出来放入 Vec
+            let lf_ctx = unsafe { Box::from_raw(p) };
+            lfs.push(lf_ctx.inner);
+        }
 
+        // 2. 构建参数
+        let args = UnionArgs {
+            rechunk,
+            parallel,
+            ..Default::default()
+        };
+
+        // 3. 调用 concat
+        // polars::prelude::concat 接受 Vec<LazyFrame>
+        let new_lf = concat(lfs, args)?;
+        
+        Ok(Box::into_raw(Box::new(LazyFrameContext { inner: new_lf })))
+    })
+}
 // ==========================================
 // 5. 实用功能
 // ==========================================
