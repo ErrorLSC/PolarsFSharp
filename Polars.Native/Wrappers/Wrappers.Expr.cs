@@ -21,6 +21,19 @@ public static partial class PolarsWrapper
     => UnaryOp(op, expr);
     private static ExprHandle UnaryDtOp(Func<ExprHandle, ExprHandle> op, ExprHandle expr) 
         => UnaryOp(op, expr);
+    public static ExprHandle RollingOp(Func<ExprHandle, string ,ExprHandle> op, ExprHandle expr, string windowSize)
+    {
+        var h = op(expr, windowSize);
+        expr.TransferOwnership();
+        return ErrorHelper.Check(h);
+    }
+    private static ExprHandle RollingByOp(Func<ExprHandle, string, ExprHandle, string, ExprHandle> op, ExprHandle expr, string windowSize, ExprHandle by, string closed)
+    {
+        var h = op(expr, windowSize, by, closed);
+        expr.TransferOwnership();
+        by.TransferOwnership(); // by 也是 Expr，会被消耗
+        return ErrorHelper.Check(h);
+    }
     // --- Expr Ops (工厂方法) ---
     // 这些方法返回新的 ExprHandle，所有权在 C# 这边，直到传给 Filter/Select
     // Leaf Nodes (不消耗其他 Expr)
@@ -294,30 +307,12 @@ public static partial class PolarsWrapper
         e.TransferOwnership();
         return ErrorHelper.Check(h);
     }
-
-    public static ExprHandle RollingMean(ExprHandle e, string windowSize)
-    {
-        var h = NativeBindings.pl_expr_rolling_mean(e, windowSize);
-        e.TransferOwnership();
-        return ErrorHelper.Check(h);
-    }
-
-    public static ExprHandle RollingMax(ExprHandle e, string windowSize)
-    {
-        var h = NativeBindings.pl_expr_rolling_max(e, windowSize);
-        e.TransferOwnership();
-        return ErrorHelper.Check(h);
-    }
-    public static ExprHandle RollingMin(ExprHandle e, string windowSize)
-    {
-        var h = NativeBindings.pl_expr_rolling_min(e, windowSize);
-        e.TransferOwnership();
-        return ErrorHelper.Check(h);
-    }
-    public static ExprHandle RollingSum(ExprHandle e, string windowSize)
-    {
-        var h = NativeBindings.pl_expr_rolling_sum(e, windowSize);
-        e.TransferOwnership();
-        return ErrorHelper.Check(h);
-    }
+    public static ExprHandle RollingMean(ExprHandle e, string w) => RollingOp(NativeBindings.pl_expr_rolling_mean, e, w);
+    public static ExprHandle RollingMax(ExprHandle e, string w) => RollingOp(NativeBindings.pl_expr_rolling_max, e, w);
+    public static ExprHandle RollingMin(ExprHandle e, string w) => RollingOp(NativeBindings.pl_expr_rolling_min, e, w);
+    public static ExprHandle RollingSum(ExprHandle e, string w) => RollingOp(NativeBindings.pl_expr_rolling_sum, e, w);
+    public static ExprHandle RollingMeanBy(ExprHandle e, string w, ExprHandle by, string closed) => RollingByOp(NativeBindings.pl_expr_rolling_mean_by, e, w, by, closed);
+    public static ExprHandle RollingSumBy(ExprHandle e, string w, ExprHandle by, string closed) => RollingByOp(NativeBindings.pl_expr_rolling_sum_by, e, w, by, closed);
+    public static ExprHandle RollingMinBy(ExprHandle e, string w, ExprHandle by, string closed) => RollingByOp(NativeBindings.pl_expr_rolling_min_by, e, w, by, closed);
+    public static ExprHandle RollingMaxBy(ExprHandle e, string w, ExprHandle by, string closed) => RollingByOp(NativeBindings.pl_expr_rolling_max_by, e, w, by, closed);
 }

@@ -98,7 +98,7 @@ macro_rules! gen_namespace_unary {
         }
     };
 }
-/// 模式 6: RollingWindow操作 (Namespace Unary)
+/// 模式 6: RollingWindow操作
 fn parse_fixed_window_size(s: &str) -> PolarsResult<usize> {
     // 去掉可能的 "i" 后缀 (Polars 习惯 "3i" 代表 3 index/rows)
     let clean_s = s.trim().trim_end_matches('i');
@@ -131,6 +131,55 @@ macro_rules! gen_rolling_op {
 
                 // 3. 调用 expr.rolling_mean(options)
                 let new_expr = ctx.inner.$method(options);
+                
+                Ok(Box::into_raw(Box::new(ExprContext { inner: new_expr })))
+            })
+        }
+    };
+}
+fn map_closed_window(s: &str) -> ClosedWindow {
+    match s {
+        "left" => ClosedWindow::Left,
+        "right" => ClosedWindow::Right,
+        "both" => ClosedWindow::Both,
+        "none" => ClosedWindow::None,
+        _ => ClosedWindow::Left, // 默认左闭右开 [ )
+    }
+}
+macro_rules! gen_rolling_by_op {
+    ($func_name:ident, $method:ident) => {
+        #[unsafe(no_mangle)]
+        pub extern "C" fn $func_name(
+            expr_ptr: *mut ExprContext,
+            window_size_ptr: *const c_char,
+            by_ptr: *mut ExprContext,       // 时间索引列
+            closed_ptr: *const c_char       // "left", "right" ...
+        ) -> *mut ExprContext {
+            ffi_try!({
+                let ctx = unsafe { Box::from_raw(expr_ptr) };
+                let by = unsafe { Box::from_raw(by_ptr) }; 
+                
+                let window_size_str = ptr_to_str(window_size_ptr).unwrap();
+                let closed_str = ptr_to_str(closed_ptr).unwrap_or("left");
+
+                // 1. 解析 Duration
+                // Duration::parse 会处理 "1d", "30m" 等格式
+                let duration = Duration::parse(window_size_str);
+
+                // 2. 构建 Options
+                let options = RollingOptionsDynamicWindow {
+                    window_size: duration,
+                    min_periods: 1, // 默认 1，防止全 Null
+                    closed_window: map_closed_window(closed_str),
+                    fn_params: None,
+                };
+
+                // 3. 调用 expr.rolling_xxx_by(by, options)
+                // 注意：在 0.50 中，window_size 已经在 options 里了，所以函数参数变少了
+                let new_expr = ctx.inner.$method(
+                    by.inner, 
+                    options
+                );
                 
                 Ok(Box::into_raw(Box::new(ExprContext { inner: new_expr })))
             })
@@ -217,6 +266,11 @@ gen_rolling_op!(pl_expr_rolling_mean, rolling_mean);
 gen_rolling_op!(pl_expr_rolling_sum, rolling_sum);
 gen_rolling_op!(pl_expr_rolling_min, rolling_min);
 gen_rolling_op!(pl_expr_rolling_max, rolling_max);
+
+gen_rolling_by_op!(pl_expr_rolling_mean_by, rolling_mean_by);
+gen_rolling_by_op!(pl_expr_rolling_sum_by, rolling_sum_by);
+gen_rolling_by_op!(pl_expr_rolling_min_by, rolling_min_by);
+gen_rolling_by_op!(pl_expr_rolling_max_by, rolling_max_by);
 
 #[unsafe(no_mangle)]
 pub extern "C" fn pl_expr_alias(expr_ptr: *mut ExprContext, name_ptr: *const c_char) -> *mut ExprContext {

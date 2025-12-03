@@ -363,4 +363,9 @@ unsafe internal partial class NativeBindings
     [LibraryImport(LibName)] public static partial ExprHandle pl_expr_rolling_sum(ExprHandle expr, [MarshalAs(UnmanagedType.LPUTF8Str)] string windowSize);
     [LibraryImport(LibName)] public static partial ExprHandle pl_expr_rolling_min(ExprHandle expr, [MarshalAs(UnmanagedType.LPUTF8Str)] string windowSize);
     [LibraryImport(LibName)] public static partial ExprHandle pl_expr_rolling_max(ExprHandle expr, [MarshalAs(UnmanagedType.LPUTF8Str)] string windowSize);
+
+    [LibraryImport(LibName,StringMarshalling = StringMarshalling.Utf8)] public static partial ExprHandle pl_expr_rolling_mean_by(ExprHandle expr, string windowSize, ExprHandle by, string closed);
+    [LibraryImport(LibName,StringMarshalling = StringMarshalling.Utf8)] public static partial ExprHandle pl_expr_rolling_sum_by(ExprHandle expr, string windowSize, ExprHandle by, string closed);
+    [LibraryImport(LibName,StringMarshalling = StringMarshalling.Utf8)] public static partial ExprHandle pl_expr_rolling_min_by(ExprHandle expr, string windowSize, ExprHandle by, string closed);
+    [LibraryImport(LibName,StringMarshalling = StringMarshalling.Utf8)] public static partial ExprHandle pl_expr_rolling_max_by(ExprHandle expr, string windowSize, ExprHandle by, string closed);
 }

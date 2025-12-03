@@ -399,3 +399,32 @@ type ``Complex Query Tests`` () =
 
         Assert.Equal(15.0, res.Float("ma_2", 1).Value)
         Assert.Equal(25.0, res.Float("ma_2", 2).Value)
+    [<Fact>]
+    member _.``Time Series: Dynamic Rolling Window`` () =
+        // 构造非均匀时间数据
+        // 10:00 -> 10
+        // 10:30 -> 20
+        // 12:00 -> 30 (此时 1小时窗口内只有它自己，因为 10:30 已经是一个半小时前了)
+        let csvContent = "time,val\n2024-01-01 10:00:00,10\n2024-01-01 10:30:00,20\n2024-01-01 12:00:00,30"
+        use csv = new TempCsv(csvContent)
+        let lf = Polars.scanCsv csv.Path (Some true)
+
+        let res = 
+            lf
+            // 必须先按时间排序，虽然 Polars 有时会自动排，但显式排是好习惯
+            |> Polars.sortLazy (Polars.col "time") false
+            |> Polars.withColumnLazy (
+                // 计算 "1h" (1小时) 内的 sum
+                // 10:00: 窗口 [09:00, 10:00) -> 10
+                // 10:30: 窗口 [09:30, 10:30) -> 10 + 20 = 30
+                // 12:00: 窗口 [11:00, 12:00) -> 30 (前面的都过期了)
+                (Polars.col "val")
+                    .RollingSumBy("1h", Polars.col "time", closed="right") // closed="left" means [ )
+                    .Alias "sum_1h"
+            )
+            |> Polars.collect
+
+        // 验证
+        Assert.Equal(10L, res.Int("sum_1h", 0).Value)
+        Assert.Equal(30L, res.Int("sum_1h", 1).Value)
+        Assert.Equal(30L, res.Int("sum_1h", 2).Value)

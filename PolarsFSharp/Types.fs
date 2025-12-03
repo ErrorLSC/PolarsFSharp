@@ -217,6 +217,22 @@ type Expr(handle: ExprHandle) =
         
     member this.RollingSum(windowSize: string) = 
         new Expr(PolarsWrapper.RollingSum(this.CloneHandle(), windowSize))
+    // 用法: col("price").RollingMeanBy("1d", col("date"))
+    member this.RollingMeanBy(windowSize: string, by: Expr, ?closed: string) =
+        let c = defaultArg closed "left"
+        new Expr(PolarsWrapper.RollingMeanBy(this.CloneHandle(), windowSize, by.CloneHandle(), c))
+
+    member this.RollingSumBy(windowSize: string, by: Expr, ?closed: string) =
+        let c = defaultArg closed "left"
+        new Expr(PolarsWrapper.RollingSumBy(this.CloneHandle(), windowSize, by.CloneHandle(), c))
+    // 用法: col("price").RollingMeanBy("1d", col("date"))
+    member this.RollingMaxBy(windowSize: string, by: Expr, ?closed: string) =
+        let c = defaultArg closed "left"
+        new Expr(PolarsWrapper.RollingMaxBy(this.CloneHandle(), windowSize, by.CloneHandle(), c))
+
+    member this.RollingMinBy(windowSize: string, by: Expr, ?closed: string) =
+        let c = defaultArg closed "left"
+        new Expr(PolarsWrapper.RollingMinBy(this.CloneHandle(), windowSize, by.CloneHandle(), c))
 
 
 and DtOps(handle: ExprHandle) =
