@@ -263,4 +263,35 @@ public static partial class PolarsWrapper
         expr.TransferOwnership();
         return ErrorHelper.Check(h);
     }
+
+    // Shift
+    public static ExprHandle Shift(ExprHandle e, long n)
+    {
+        var h = NativeBindings.pl_expr_shift(e, n);
+        e.TransferOwnership();
+        return ErrorHelper.Check(h);
+    }
+
+    // Diff
+    public static ExprHandle Diff(ExprHandle e, long n)
+    {
+        var h = NativeBindings.pl_expr_diff(e, n);
+        e.TransferOwnership();
+        return ErrorHelper.Check(h);
+    }
+
+    // Fill
+    public static ExprHandle ForwardFill(ExprHandle e, uint limit)
+    {
+        var h = NativeBindings.pl_expr_forward_fill(e, limit);
+        e.TransferOwnership();
+        return ErrorHelper.Check(h);
+    }
+
+    public static ExprHandle BackwardFill(ExprHandle e, uint limit)
+    {
+        var h = NativeBindings.pl_expr_backward_fill(e, limit);
+        e.TransferOwnership();
+        return ErrorHelper.Check(h);
+    }
 }

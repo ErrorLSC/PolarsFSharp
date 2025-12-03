@@ -70,7 +70,7 @@ type ``Complex Query Tests`` () =
 
         let res = 
             lf
-            |> Polars.withColumns (
+            |> Polars.withColumnsLazy (
                 // 1. String Split -> List -> First
                 [
                 (Polars.col "name").Str.Split(" ").List.First()
@@ -133,19 +133,19 @@ type ``Complex Query Tests`` () =
 
         let res = 
             lf
-            |> Polars.withColumn (
+            |> Polars.withColumnLazy (
                 // 1. Split 变成 List
-                (Polars.col "tags").Str.Split(" ").Alias("tag_list")
+                (Polars.col "tags").Str.Split(" ").Alias "tag_list"
             )
-            |> Polars.withColumn (
+            |> Polars.withColumnLazy (
                 // 2. 演示 cols([...]): 同时选中 name 和 tag_list，加上前缀
                 // 虽然这里只是演示，通常用于批量数学运算
                 Polars.cols ["name"; "tag_list"]
                 |> fun e -> e.Name.Prefix("my_")
             )
-            |> Polars.withColumn (
+            |> Polars.withColumnLazy (
                 // 3. List Join (还原回去)
-                (Polars.col "my_tag_list").List.Join("-").Alias("joined_tags")
+                (Polars.col "my_tag_list").List.Join("-").Alias "joined_tags"
             )
             |> Polars.collect
 
@@ -189,25 +189,25 @@ type ``Complex Query Tests`` () =
         let res = 
             lf
             // 1. Struct 测试: 把 score1, score2 打包成 "scores_struct"
-            |> Polars.withColumn (
+            |> Polars.withColumnLazy (
                 Polars.asStruct [Polars.col "score1"; Polars.col "score2"]
                 |> Polars.alias "scores_struct"
             )
             // 2. List 测试: 
             // 假设我们把 struct 里的字段取出来，做一个计算 (演示 Struct.Field)
-            |> Polars.withColumn (
+            |> Polars.withColumnLazy (
                 (Polars.col "scores_struct").Struct.Field("score1").Alias("s1_extracted")
             )
             // 3. List Agg 测试 (既然没有 concat_list，我们造一个伪需求：如果 split 后的 list)
             // 我们手动 split 一个字符串 "1 5 2"
-            |> Polars.withColumn (
+            |> Polars.withColumnLazy (
                 Polars.lit "1 5 2"
                 |> Polars.alias "raw_nums"
             )
             // 4. 处理 List: Split -> Sort(Desc) -> First
             // "1 5 2" -> ["1", "5", "2"] -> ["5", "2", "1"] -> "5"
             // 注意：Split 出来是 String，Sort 默认按字典序，"5" > "2" > "1"
-            |> Polars.withColumn maxCharExpr
+            |> Polars.withColumnLazy maxCharExpr
             |> Polars.collect
 
         // 验证 Struct Field
@@ -224,7 +224,7 @@ type ``Complex Query Tests`` () =
 
         let res = 
             lf
-            |> Polars.withColumn (
+            |> Polars.withColumnLazy (
                 // 逻辑: col("salary") - col("salary").mean().over([col("dept")])
                 Polars.col "salary" - 
                 (Polars.col "salary").Mean().Over [Polars.col "dept"]
@@ -338,3 +338,41 @@ type ``Complex Query Tests`` () =
         Assert.Equal(1L, res.Rows)
         Assert.Equal("Bob", res.String("name", 0).Value)
         Assert.Equal(60L, res.Int("age_double", 0).Value)
+    [<Fact>]
+    member _.``Time Series: Shift, Diff, ForwardFill`` () =
+        // 数据: 价格序列，中间有空值
+        // P1: 10
+        // P2: null
+        // P3: 20
+        use csv = new TempCsv("price\n10\n\n20")
+        let df = Polars.readCsv csv.Path None
+
+        let res = 
+            df 
+            |> Polars.select [
+                Polars.col "price"
+                
+                // 1. Forward Fill: null 变成 10
+                (Polars.col "price").ForwardFill().Alias "price_ffill"
+                
+                // 2. Shift(1): 向下平移一行
+                (Polars.col "price").Shift(1L).Alias "price_lag1"
+            ]
+            |> Polars.withColumn (
+                // 3. Diff: 当前值 - 上一个值 (基于 ffill 后的数据)
+                (Polars.col "price_ffill").Diff(1L).Alias "price_diff"
+            )
+
+        // 验证
+        // Row 0: 10, ffill=10, lag=null, diff=null
+        Assert.Equal(10L, res.Int("price_ffill", 0).Value)
+        Assert.True(res.Int("price_lag1", 0).IsNone)
+
+        // Row 1: null, ffill=10, lag=10, diff=0 (10-10)
+        Assert.Equal(10L, res.Int("price_ffill", 1).Value)
+        Assert.Equal(10L, res.Int("price_lag1", 1).Value)
+        Assert.Equal(0L, res.Int("price_diff", 1).Value)
+
+        // Row 2: 20, ffill=20, lag=null(原始price是null), diff=10 (20-10)
+        Assert.Equal(20L, res.Int("price_ffill", 2).Value)
+        Assert.Equal(10L, res.Int("price_diff", 2).Value)

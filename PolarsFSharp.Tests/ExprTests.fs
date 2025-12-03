@@ -84,7 +84,7 @@ type ``Expression Logic Tests`` () =
         // 结果应该是 3 行 (10, 0, 30)
         let res = 
             lf 
-            |> Polars.withColumn (
+            |> Polars.withColumnLazy (
                 Polars.col "age" 
                 |> Polars.fillNull (Polars.lit 0) 
                 |> Polars.alias "age_filled"

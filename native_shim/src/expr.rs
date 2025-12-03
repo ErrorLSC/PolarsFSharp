@@ -560,3 +560,71 @@ pub extern "C" fn pl_expr_cast(
         Ok(Box::into_raw(Box::new(ExprContext { inner: new_expr })))
     })
 }
+// --- Time Series: Shift / Diff ---
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_expr_shift(
+    expr_ptr: *mut ExprContext,
+    n: i64
+) -> *mut ExprContext {
+    ffi_try!({
+        let ctx = unsafe { Box::from_raw(expr_ptr) };
+        // shift(n)
+        let new_expr = ctx.inner.shift(lit(n)); 
+        Ok(Box::into_raw(Box::new(ExprContext { inner: new_expr })))
+    })
+}
+// diff(n, null_behavior)
+// null_behavior: "ignore" or "drop" (Polars 0.50 默认可能是 ignore)
+// 这里简单起见，只暴露 n，使用默认行为
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_expr_diff(
+    expr_ptr: *mut ExprContext,
+    n: i64
+) -> *mut ExprContext {
+    ffi_try!({
+        let ctx = unsafe { Box::from_raw(expr_ptr) };
+        // diff(n, null_behavior)
+        // NullBehavior::Ignore 是通用默认值
+        let new_expr = ctx.inner.diff(n.into(), Default::default());
+        Ok(Box::into_raw(Box::new(ExprContext { inner: new_expr })))
+    })
+}
+// --- Time Series: Fill ---
+
+// forward_fill -> fill_null_with_strategy(Forward)
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_expr_forward_fill(
+    expr_ptr: *mut ExprContext,
+    limit: u32 // 0 = None (Unlimited)
+) -> *mut ExprContext {
+    ffi_try!({
+        let ctx = unsafe { Box::from_raw(expr_ptr) };
+        
+        // 转换 limit: 0 -> None, 其他 -> Some
+        let limit_opt = if limit == 0 { None } else { Some(limit as u32) };
+        
+        // 使用策略枚举
+        let strategy = FillNullStrategy::Forward(limit_opt);
+        let new_expr = ctx.inner.fill_null_with_strategy(strategy);
+        
+        Ok(Box::into_raw(Box::new(ExprContext { inner: new_expr })))
+    })
+}
+
+// backward_fill -> fill_null_with_strategy(Backward)
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_expr_backward_fill(
+    expr_ptr: *mut ExprContext,
+    limit: u32
+) -> *mut ExprContext {
+    ffi_try!({
+        let ctx = unsafe { Box::from_raw(expr_ptr) };
+        
+        let limit_opt = if limit == 0 { None } else { Some(limit as u32) };
+        
+        let strategy = FillNullStrategy::Backward(limit_opt);
+        let new_expr = ctx.inner.fill_null_with_strategy(strategy);
+        
+        Ok(Box::into_raw(Box::new(ExprContext { inner: new_expr })))
+    })
+}

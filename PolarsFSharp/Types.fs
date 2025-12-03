@@ -178,7 +178,33 @@ type Expr(handle: ExprHandle) =
 
     // 重载：方便只传一个分组列的情况
     member this.Over(partitionCol: Expr) =
-        this.Over([partitionCol])
+        this.Over [partitionCol]
+    // Shift (平移)
+    member this.Shift(n: int64) = new Expr(PolarsWrapper.Shift(this.CloneHandle(), n))
+    // 默认 shift 1
+    member this.Shift() = this.Shift(1L)
+
+    // Diff (差分)
+    member this.Diff(n: int64) = new Expr(PolarsWrapper.Diff(this.CloneHandle(), n))
+    // 默认 diff 1
+    member this.Diff() = this.Diff 1L
+
+    // Fill (填充)
+    // limit: 0 表示无限填充
+    member this.ForwardFill(?limit: int) = 
+        let l = defaultArg limit 0
+        new Expr(PolarsWrapper.ForwardFill(this.CloneHandle(), uint l))
+
+    member this.BackwardFill(?limit: int) = 
+        let l = defaultArg limit 0
+        new Expr(PolarsWrapper.BackwardFill(this.CloneHandle(), uint l))
+    
+    // 别名
+    member this.FillNullStrategy(strategy: string) =
+        match strategy.ToLower() with
+        | "forward" | "ffill" -> this.ForwardFill()
+        | "backward" | "bfill" -> this.BackwardFill()
+        | _ -> failwith "Unsupported strategy"
 and DtOps(handle: ExprHandle) =
     let wrap op = new Expr(op handle)
     member _.Year() = wrap PolarsWrapper.DtYear

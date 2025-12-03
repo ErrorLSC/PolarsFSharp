@@ -66,7 +66,7 @@ type ``Basic Functionality Tests`` () =
         
         let lf2 = 
             lf 
-            |> Polars.withColumn (
+            |> Polars.withColumnLazy (
                 (Polars.col "a" * Polars.lit 2).Alias "a_double"
             )
             |> Polars.filterLazy (Polars.col "b" .> Polars.lit 0)

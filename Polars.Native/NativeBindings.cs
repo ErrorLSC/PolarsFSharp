@@ -350,4 +350,12 @@ unsafe internal partial class NativeBindings
 
     [LibraryImport(LibName)] 
     public static partial LazyFrameHandle pl_sql_context_execute(SqlContextHandle ctx, IntPtr query);
+
+    // Shift / Diff
+    [LibraryImport(LibName)] public static partial ExprHandle pl_expr_shift(ExprHandle expr, long n);
+    [LibraryImport(LibName)] public static partial ExprHandle pl_expr_diff(ExprHandle expr, long n);
+
+    // Fill
+    [LibraryImport(LibName)] public static partial ExprHandle pl_expr_forward_fill(ExprHandle expr, uint limit);
+    [LibraryImport(LibName)] public static partial ExprHandle pl_expr_backward_fill(ExprHandle expr, uint limit);
 }

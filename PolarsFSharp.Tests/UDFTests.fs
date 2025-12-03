@@ -53,7 +53,7 @@ type ``UDF Tests`` () =
         // 关键点：必须传入 PlDataType.String，否则 Polars 可能会把结果当成 Int 处理导致乱码
         let df = 
             lf 
-            |> Polars.withColumn (
+            |> Polars.withColumnLazy (
                 Polars.col "num"
                 |> fun e -> e.Map(udf, PlDataType.String)
                 |> Polars.alias "desc"
@@ -79,7 +79,7 @@ type ``UDF Tests`` () =
         // 2. 断言会抛出异常
         let ex = Assert.Throws<Exception>(fun () -> 
             lf 
-            |> Polars.withColumn (
+            |> Polars.withColumnLazy (
                 Polars.col "num" 
                 |> fun e -> e.Map(udf, PlDataType.SameAsInput)
             )
@@ -104,7 +104,7 @@ type ``UDF Tests`` () =
 
         let df = 
             lf 
-            |> Polars.withColumn (
+            |> Polars.withColumnLazy (
                 Polars.col "num"
                 // 2. 直接调用 Udf.map
                 // 泛型 'T 和 'U 会自动推断为 int 和 string

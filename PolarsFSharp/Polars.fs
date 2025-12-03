@@ -52,7 +52,17 @@ module Polars =
     let count () = new Expr(PolarsWrapper.Len())
     let len () = new Expr(PolarsWrapper.Len())
     // --- Eager Ops ---
-    let withColumnsEager (exprs: Expr list) (df: DataFrame) : DataFrame =
+    // 用法: df |> withColumn (col "a" * lit 2)
+    let withColumn (expr: Expr) (df: DataFrame) : DataFrame =
+        // 1. 克隆 Handle (Eager 操作不消耗原 Expr)
+        let exprHandle = expr.CloneHandle()
+        
+        // 2. 包装成数组调用 C# Wrapper
+        // 注意：C# Wrapper.WithColumns 内部会调用 HandlesToPtrs -> TransferOwnership，所以这里由 Wrapper 负责消耗 handle
+        let h = PolarsWrapper.WithColumns(df.Handle, [| exprHandle |])
+        
+        new DataFrame(h)
+    let withColumns (exprs: Expr list) (df: DataFrame) : DataFrame =
         let handles = exprs |> List.map (fun e -> e.Handle) |> List.toArray
         let h = PolarsWrapper.WithColumns(df.Handle, handles)
         new DataFrame(h)
@@ -184,14 +194,14 @@ module Polars =
         new LazyFrame(h)
 
     // 5. WithColumn
-    let withColumn (expr: Expr) (lf: LazyFrame) : LazyFrame =
+    let withColumnLazy (expr: Expr) (lf: LazyFrame) : LazyFrame =
         let lfClone = lf.CloneHandle()
         let exprClone = expr.CloneHandle()
         let handles = [| exprClone |] // 使用克隆的 handle
         let h = PolarsWrapper.LazyWithColumns(lfClone, handles)
         new LazyFrame(h)
 
-    let withColumns (exprs: Expr list) (lf: LazyFrame) : LazyFrame =
+    let withColumnsLazy (exprs: Expr list) (lf: LazyFrame) : LazyFrame =
         // 1. 克隆 LazyFrame
         let lfClone = lf.CloneHandle()
         
