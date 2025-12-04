@@ -36,13 +36,13 @@ let df =
 
 // 3. Show results
 df |> Polars.show
-
+```
 ## Advanced Examples
 
 Time Series Join (As-Of Join)
 Match trades with the most recent quote before the trade time.
 
-F#
+```F#
 
 // lfTrades: time, price
 // lfQuotes: time, bid, ask
@@ -55,10 +55,11 @@ let res =
         (Some "backward") // Strategy
         (Some "2m")       // Tolerance: 2 minutes
     |> Polars.collect
-UDF (User Defined Functions)
+```
+## UDF (User Defined Functions)
 Run custom C# logic on columns with Zero-Copy overhead.
 
-F#
+```F#
 
 open PolarsFSharp.Udf
 
@@ -71,7 +72,7 @@ lf
     Polars.col "value"
     |> fun e -> e.Map(mapInt32 addOne) // Auto-vectorized via Arrow
 )
-
+```
 ## Architecture
 Polars.Native: C# P/Invoke bindings (LibraryImport) handling memory safety (GC & Rust Drop).
 
