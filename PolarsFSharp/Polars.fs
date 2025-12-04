@@ -3,115 +3,134 @@ namespace PolarsFSharp
 open System
 open Apache.Arrow
 open Polars.Native
-
+/// <summary>
+/// The main entry point for Polars operations in F#.
+/// </summary>
 module Polars =
     open Apache.Arrow.Types
     
-    // --- 积木工厂 ---
-    let col (name: string) = new Expr(PolarsWrapper.Col(name))
-    let alias (name: string) (expr: Expr) = expr.Alias(name)
+    // --- Factories ---
+    /// <summary> Reference a column by name. </summary>
+    let col (name: string) = new Expr(PolarsWrapper.Col name)
+    /// <summary> Select multiple columns (returns a Wildcard Expression). </summary>
+    let cols (names: string list) =
+        let arr = List.toArray names
+        new Expr(PolarsWrapper.Cols arr)
+    let all () = new Selector(PolarsWrapper.SelectorAll())
 
-    // --- 黑魔法：万能 lit ---
+    // --- Lit (SRTP) ---
     type LitMechanism = LitMechanism with
         static member ($) (LitMechanism, v: int) = new Expr(PolarsWrapper.Lit(v))
         static member ($) (LitMechanism, v: string) = new Expr(PolarsWrapper.Lit(v))
         static member ($) (LitMechanism, v: double) = new Expr(PolarsWrapper.Lit(v))
         static member ($) (LitMechanism, v: DateTime) = new Expr(PolarsWrapper.Lit(v))
 
+    /// <summary> Create a literal expression from a value. </summary>
     let inline lit (value: ^T) : Expr = 
         ((^T or LitMechanism) : (static member ($) : LitMechanism * ^T -> Expr) (LitMechanism, value))
 
     // --- IO ---
+    /// <summary> Read a CSV file into a DataFrame (Eager). </summary>
     let readCsv (path: string) (tryParseDates: bool option): DataFrame =
         let parseDates = defaultArg tryParseDates true
         let handle = PolarsWrapper.ReadCsv(path, parseDates)
         new DataFrame(handle)
-
-    let readParquet (path: string) = new DataFrame(PolarsWrapper.ReadParquet(path))
-
+    /// <summary> Read a parquet file into a DataFrame (Eager). </summary>
+    let readParquet (path: string) = new DataFrame(PolarsWrapper.ReadParquet path)
+    /// <summary> Scan a CSV file into a LazyFrame. </summary>
+    let scanCsv (path: string) (tryParseDates: bool option) = 
+        let parseDates = defaultArg tryParseDates true
+        new LazyFrame(PolarsWrapper.ScanCsv(path, parseDates))
+    /// <summary> Scan a parquet file into a LazyFrame. </summary>
+    let scanParquet (path: string) = new LazyFrame(PolarsWrapper.ScanParquet path)
+    /// <summary> Read a JSON file into a DataFrame (Eager). </summary>
+    let readJson (path: string) : DataFrame =
+        new DataFrame(PolarsWrapper.ReadJson path)
+    /// <summary> Scan a JSON file into a LazyFrame. </summary>
+    let scanNdjson (path: string) : LazyFrame =
+        new LazyFrame(PolarsWrapper.ScanNdjson path)
+    /// <summary> Read an IPC file into a DataFrame (Eager). </summary>
+    let readIpc (path: string) = new DataFrame(PolarsWrapper.ReadIpc path)
+    /// <summary> Scan an IPC file into a LazyFrame. </summary>
+    let scanIpc (path: string) = new LazyFrame(PolarsWrapper.ScanIpc path)
+    /// <summary> Write DataFrame to CSV. </summary>
     let writeCsv (path: string) (df: DataFrame) = 
         PolarsWrapper.WriteCsv(df.Handle, path)
         df 
-
+    /// <summary> Write DataFrame to Parquet. </summary>
     let writeParquet (path: string) (df: DataFrame) = 
         PolarsWrapper.WriteParquet(df.Handle, path)
         df
-    // [新增] JSON
-    let readJson (path: string) : DataFrame =
-        new DataFrame(PolarsWrapper.ReadJson(path))
-
-    // [新增] NDJSON (Lazy)
-    let scanNdjson (path: string) : LazyFrame =
-        new LazyFrame(PolarsWrapper.ScanNdjson(path))
+    /// <summary> Write LazyFrame execution result to Parquet (Streaming). </summary>
     let sinkParquet (path: string) (lf: LazyFrame) : unit =
         let lfClone = lf.CloneHandle()
         PolarsWrapper.SinkParquet(lfClone, path)
-    let readIpc (path: string) = new DataFrame(PolarsWrapper.ReadIpc(path))
-    let scanIpc (path: string) = new LazyFrame(PolarsWrapper.ScanIpc(path))
+    /// <summary> Write LazyFrame execution result to IPC (Streaming). </summary>
     let sinkIpc (path: string) (lf: LazyFrame) = 
         let lfClone = lf.CloneHandle()
         PolarsWrapper.SinkIpc(lfClone, path)
+    /// <summary> Transform RecordBatch into DataFrame </summary>
     let fromArrow (batch: Apache.Arrow.RecordBatch) : DataFrame =
         new DataFrame(PolarsWrapper.FromArrow(batch))
     // --- Expr Helpers ---
-    // [新增] cast
+
     let cast (dtype: DataType) (e: Expr) = e.Cast(dtype)
-    
-    // 常用类型快捷方式 (可选)
     let int32 = DataType.Int32
     let float64 = DataType.Float64
     let string = DataType.String
-    // [新增] count/len
     let count () = new Expr(PolarsWrapper.Len())
-    let len () = new Expr(PolarsWrapper.Len())
+    let len = count
+    let alias (name: string) (expr: Expr) = expr.Alias name
+    let collect (lf: LazyFrame) : DataFrame = 
+        let lfClone = lf.CloneHandle()
+        let dfHandle = PolarsWrapper.LazyCollect(lfClone)
+        new DataFrame(dfHandle)
+    let asExpr (s: Selector) = s.ToExpr()
+    let exclude (names: string list) (s: Selector) = s.Exclude names
+    let asStruct (exprs: Expr list) =
+        let handles = exprs |> List.map (fun e -> e.CloneHandle()) |> List.toArray
+        new Expr(PolarsWrapper.AsStruct(handles))
     // --- Eager Ops ---
-    // 用法: df |> withColumn (col "a" * lit 2)
+    /// <summary> Add or replace columns. </summary>
     let withColumn (expr: Expr) (df: DataFrame) : DataFrame =
-        // 1. 克隆 Handle (Eager 操作不消耗原 Expr)
         let exprHandle = expr.CloneHandle()
-        
-        // 2. 包装成数组调用 C# Wrapper
-        // 注意：C# Wrapper.WithColumns 内部会调用 HandlesToPtrs -> TransferOwnership，所以这里由 Wrapper 负责消耗 handle
         let h = PolarsWrapper.WithColumns(df.Handle, [| exprHandle |])
-        
         new DataFrame(h)
     let withColumns (exprs: Expr list) (df: DataFrame) : DataFrame =
         let handles = exprs |> List.map (fun e -> e.Handle) |> List.toArray
         let h = PolarsWrapper.WithColumns(df.Handle, handles)
         new DataFrame(h)
+    /// <summary> Filter rows based on a boolean expression. </summary>
     let filter (expr: Expr) (df: DataFrame) : DataFrame =
         let h = PolarsWrapper.Filter(df.Handle, expr.Handle)
         new DataFrame(h)
-
+    /// <summary> Select columns from DataFrame. </summary>
     let select (exprs: Expr list) (df: DataFrame) : DataFrame =
         let handles = exprs |> List.map (fun e -> e.Handle) |> List.toArray
         let h = PolarsWrapper.Select(df.Handle, handles)
         new DataFrame(h)
-
+    /// <summary> Sort (Order By) the DataFrame. </summary>
     let sort (expr: Expr) (desc: bool) (df: DataFrame) : DataFrame =
-        // Clone Handle (因为 Eager 操作不应消耗 Expr 的原始引用，虽然底层消耗了 handle)
-        // 这里的逻辑稍微有点绕：Wrapper.Sort 会消耗 ExprHandle。
-        // 为了让 F# 的 Expr 对象可复用，我们需要 CloneHandle。
         let h = PolarsWrapper.Sort(df.Handle, expr.CloneHandle(), desc)
         new DataFrame(h)
-
-    // 保留 orderBy 别名
     let orderBy (expr: Expr) (desc: bool) (df: DataFrame) = sort expr desc df
-
+    /// <summary> Group by keys and apply aggregations. </summary>
     let groupBy (keys: Expr list) (aggs: Expr list) (df: DataFrame) : DataFrame =
         let kHandles = keys |> List.map (fun e -> e.Handle) |> List.toArray
         let aHandles = aggs |> List.map (fun e -> e.Handle) |> List.toArray
         let h = PolarsWrapper.GroupByAgg(df.Handle, kHandles, aHandles)
         new DataFrame(h)
-
+    /// <summary> Join two DataFrames into one. </summary>
     let join (other: DataFrame) (leftOn: Expr list) (rightOn: Expr list) (how: JoinType) (left: DataFrame) : DataFrame =
         let lHandles = leftOn |> List.map (fun e -> e.Handle) |> List.toArray
         let rHandles = rightOn |> List.map (fun e -> e.Handle) |> List.toArray
         let h = PolarsWrapper.Join(left.Handle, other.Handle, lHandles, rHandles, how.ToNative())
         new DataFrame(h)
+    let concat (dfs: DataFrame list) : DataFrame =
 
+        let handles = dfs |> List.map (fun df -> df.CloneHandle()) |> List.toArray
+        new DataFrame(PolarsWrapper.Concat handles)
     let head (n: int) (df: DataFrame) : DataFrame =
-        // 这里的 n 转 uint，PolarsWrapper 接收 uint
         let h = PolarsWrapper.Head(df.Handle, uint n)
         new DataFrame(h)
     let explode (exprs: Expr list) (df: DataFrame) : DataFrame =
@@ -121,92 +140,73 @@ module Polars =
 
     // --- Reshaping (Eager) ---
 
-    // 1. Pivot
-    // 参数顺序：index -> columns -> values -> agg -> df
+    //// <summary> Pivot the DataFrame from long to wide format. </summary>
     let pivot (index: string list) (columns: string list) (values: string list) (aggFn: PivotAgg) (df: DataFrame) : DataFrame =
         let iArr = List.toArray index
         let cArr = List.toArray columns
         let vArr = List.toArray values
         new DataFrame(PolarsWrapper.Pivot(df.Handle, iArr, cArr, vArr, aggFn.ToNative()))
 
-    // 2. Unpivot (Melt)
+    /// <summary> Unpivot (Melt) the DataFrame from wide to long format. </summary>
     let unpivot (index: string list) (on: string list) (variableName: string option) (valueName: string option) (df: DataFrame) : DataFrame =
         let iArr = List.toArray index
         let oArr = List.toArray on
         let varN = Option.toObj variableName 
         let valN = Option.toObj valueName 
         new DataFrame(PolarsWrapper.Unpivot(df.Handle, iArr, oArr, varN, valN))
-
-    // 别名
     let melt = unpivot    
-
+    // Arithmetic Helpers
     let sum (e: Expr) = e.Sum()
     let mean (e: Expr) = e.Mean()
     let max (e: Expr) = e.Max()
     let min (e: Expr) = e.Min()
-    let abs (e: Expr) = e.Abs()
+    // Fill Helpers
     let fillNull (fillValue: Expr) (e: Expr) = e.FillNull(fillValue)
-    
     let isNull (e: Expr) = e.IsNull()
-    
     let isNotNull (e: Expr) = e.IsNotNull()
     // Math Helpers
+    let abs (e: Expr) = e.Abs()
     let pow (exponent: Expr) (baseExpr: Expr) = baseExpr.Pow(exponent)
     let sqrt (e: Expr) = e.Sqrt()
     let exp (e: Expr) = e.Exp()
 
-    // cols(["a", "b"])
-    // 这是一个 Expr 工厂方法
-    let cols (names: string list) =
-        let arr = List.toArray names
-        new Expr(PolarsWrapper.Cols(arr))
-
     // --- Lazy API ---
-    let scanCsv (path: string) (tryParseDates: bool option) = 
-        let parseDates = defaultArg tryParseDates true
-        new LazyFrame(PolarsWrapper.ScanCsv(path, parseDates))
 
-    let scanParquet (path: string) = new LazyFrame(PolarsWrapper.ScanParquet(path))
-    let explain (lf: LazyFrame) = lf.Explain(true)
-    let explainUnoptimized (lf: LazyFrame) = lf.Explain(false)
+    let explain (lf: LazyFrame) = lf.Explain true
+    let explainUnoptimized (lf: LazyFrame) = lf.Explain false
     let schema (lf: LazyFrame) = lf.Schema
-    // 1. Filter
+    /// <summary> Filter rows based on a boolean expression. </summary>
     let filterLazy (expr: Expr) (lf: LazyFrame) : LazyFrame =
-        // 关键点：
-        // 1. 克隆 lf (因为 Rust 会消耗它)
-        // 2. 克隆 expr (因为 Rust 也会消耗它，而用户可能想复用 expr)
         let lfClone = lf.CloneHandle()
         let exprClone = expr.CloneHandle()
         
         let h = PolarsWrapper.LazyFilter(lfClone, exprClone)
         new LazyFrame(h)
 
-    // 2. Select
+    /// <summary> Select columns from LazyFrame. </summary>
     let selectLazy (exprs: Expr list) (lf: LazyFrame) : LazyFrame =
         let lfClone = lf.CloneHandle()
-        // 列表里的每个 Expr 都要克隆
         let handles = exprs |> List.map (fun e -> e.CloneHandle()) |> List.toArray
         
         let h = PolarsWrapper.LazySelect(lfClone, handles)
         new LazyFrame(h)
 
-    // 3. Sort
+    /// <summary> Sort (Order By) the LazyFrame. </summary>
     let sortLazy (expr: Expr) (desc: bool) (lf: LazyFrame) : LazyFrame =
         let lfClone = lf.CloneHandle()
         let exprClone = expr.CloneHandle()
         let h = PolarsWrapper.LazySort(lfClone, exprClone, desc)
         new LazyFrame(h)
 
-    // 别名
     let orderByLazy (expr: Expr) (desc: bool) (lf: LazyFrame) = sortLazy expr desc lf
 
-    // 4. Limit
+    // Limit
     let limit (n: uint) (lf: LazyFrame) : LazyFrame =
         let lfClone = lf.CloneHandle()
         let h = PolarsWrapper.LazyLimit(lfClone, n)
         new LazyFrame(h)
 
-    // 5. WithColumn
+    // WithColumn
     let withColumnLazy (expr: Expr) (lf: LazyFrame) : LazyFrame =
         let lfClone = lf.CloneHandle()
         let exprClone = expr.CloneHandle()
@@ -215,18 +215,11 @@ module Polars =
         new LazyFrame(h)
 
     let withColumnsLazy (exprs: Expr list) (lf: LazyFrame) : LazyFrame =
-        // 1. 克隆 LazyFrame
         let lfClone = lf.CloneHandle()
-        
-        // 2. 克隆列表里的每一个 Expr
-        // 注意：这里必须用 CloneHandle()，否则原来的 Expr 列表也会失效
         let handles = exprs |> List.map (fun e -> e.CloneHandle()) |> List.toArray
-        
-        // 3. 调用 C# Wrapper (传入的全是副本)
         let h = PolarsWrapper.LazyWithColumns(lfClone, handles)
         new LazyFrame(h)
-    // 6. GroupBy
-    // 用法: lf |> Polars.groupByLazy [col "a"] [count()]
+    /// <summary> Group by keys and apply aggregations. </summary>
     let groupByLazy (keys: Expr list) (aggs: Expr list) (lf: LazyFrame) : LazyFrame =
         let lfClone = lf.CloneHandle()
         let kHandles = keys |> List.map (fun e -> e.CloneHandle()) |> List.toArray
@@ -234,7 +227,7 @@ module Polars =
         
         let h = PolarsWrapper.LazyGroupByAgg(lfClone, kHandles, aHandles)
         new LazyFrame(h)
-    // Lazy Unpivot
+    /// <summary> Unpivot (Melt) the LazyFrame from wide to long format. </summary>
     let unpivotLazy (index: string list) (on: string list) (variableName: string option) (valueName: string option) (lf: LazyFrame) : LazyFrame =
         let lfClone = lf.CloneHandle() // 必须 Clone
         let iArr = List.toArray index
@@ -252,6 +245,7 @@ module Polars =
         let rOnArr = rightOn |> List.map (fun e -> e.CloneHandle()) |> List.toArray
         
         new LazyFrame(PolarsWrapper.Join(lClone, rClone, lOnArr, rOnArr, how.ToNative()))
+    /// <summary> Perform an As-Of Join (time-series join). </summary>
     let joinAsOf (other: LazyFrame) 
                  (leftOn: Expr) (rightOn: Expr) 
                  (byLeft: Expr list) (byRight: Expr list) 
@@ -281,15 +275,6 @@ module Polars =
         )
         new LazyFrame(h)
 
-    // [新增] Eager Concat
-    let concat (dfs: DataFrame list) : DataFrame =
-        // 这里的 CloneHandle 是为了用户体验：用户可能不希望 concat 之后原表就废了
-        // 所以我们手动 Clone 一份传给底层去消费
-        let handles = dfs |> List.map (fun df -> df.CloneHandle()) |> List.toArray
-        
-        // 注意：Wrapper.Concat 会 SetInvalid，所以这里的 dfs 列表里的对象之后就不能用了
-        // 这是符合线性类型逻辑的。如果想支持 Copy，需要在 Rust 加 pl_dataframe_clone
-        new DataFrame(PolarsWrapper.Concat handles)
     let concatLazy (lfs: LazyFrame list) : LazyFrame =
         // 同样，LazyFrame 支持 CloneHandle (我们之前加过)
         // 这里我们可以选择自动 Clone，保持 Functional 的不可变感觉
@@ -301,43 +286,23 @@ module Polars =
         let lfClone = lf.CloneHandle()
         new DataFrame(PolarsWrapper.CollectStreaming(lfClone))
 
-    // Collect (触发执行)
-    let collect (lf: LazyFrame) : DataFrame = 
-        // Collect 也会消耗 LazyFrame，所以也要克隆！
-        // 这样你可以 collect 多次 (例如一次 show，一次 save)
-        let lfClone = lf.CloneHandle()
-        let dfHandle = PolarsWrapper.LazyCollect(lfClone)
-        new DataFrame(dfHandle)
-    // all() 现在返回 Selector
-    let all () = new Selector(PolarsWrapper.SelectorAll())
-    let asExpr (s: Selector) = s.ToExpr()
-    // exclude 专门针对 Selector
-    let exclude (names: string list) (s: Selector) = s.Exclude(names)
-    // [新增] asStruct (将多列打包成 Struct)
-    // 用法: asStruct [col "a"; col "b"]
-    let asStruct (exprs: Expr list) =
-        let handles = exprs |> List.map (fun e -> e.CloneHandle()) |> List.toArray
-        new Expr(PolarsWrapper.AsStruct(handles))
-        
-    // [新增] over
-    // 用法: col "salary" |> sum |> over [col "dept"]
     let over (partitionBy: Expr list) (e: Expr) = e.Over(partitionBy)
     // SQL entry
     let sqlContext () = new SqlContext()
     let ifElse (predicate: Expr) (ifTrue: Expr) (ifFalse: Expr) : Expr =
-        // 记得 CloneHandle，因为 Wrapper 会消耗它们
         let p = predicate.CloneHandle()
         let t = ifTrue.CloneHandle()
         let f = ifFalse.CloneHandle()
         
         new Expr(PolarsWrapper.IfElse(p, t, f))
+
     // --- Show / Helper ---
 
     let rec private formatValue (col: IArrowArray) (index: int) : string =
         if col.IsNull(index) then "null"
         else
             match col with
-            // --- 基础数值 (直接调用 .Value.ToString()) ---
+            // --- Base numbers ---
             | :? Int8Array as arr -> arr.GetValue(index).Value.ToString()
             | :? Int16Array as arr -> arr.GetValue(index).Value.ToString()
             | :? Int32Array as arr -> arr.GetValue(index).Value.ToString()
@@ -349,14 +314,14 @@ module Polars =
             | :? FloatArray as arr -> arr.GetValue(index).Value.ToString()
             | :? DoubleArray as arr -> arr.GetValue(index).Value.ToString()
             
-            // --- 文本 ---
-            | :? StringArray as arr -> sprintf "\"%s\"" (arr.GetString(index))
-            | :? StringViewArray as arr -> sprintf "\"%s\"" (arr.GetString(index))
+            // --- String ---
+            | :? StringArray as arr -> sprintf "\"%s\"" (arr.GetString index)
+            | :? StringViewArray as arr -> sprintf "\"%s\"" (arr.GetString index)
             
-            // [修复] Boolean: 先转 string 再 ToLower
+            // --- Boolean ---
             | :? BooleanArray as arr -> arr.GetValue(index).Value.ToString().ToLower()
             
-            // --- 二进制 (Binary) ---
+            // --- Binary ---
             | :? BinaryArray as arr -> 
                 let bytes = arr.GetBytes(index).ToArray()
                 let hex = BitConverter.ToString(bytes).Replace("-", "").ToLower()
@@ -368,12 +333,12 @@ module Polars =
                 if hex.Length > 20 then sprintf "x'%s...'" (hex.Substring(0, 20))
                 else sprintf "x'%s'" hex
 
-            // --- 日期 (Date) ---
+            // --- Date) ---
             | :? Date32Array as arr -> 
                 let v = arr.GetValue(index).Value
                 DateTime(1970, 1, 1).AddDays(float v).ToString("yyyy-MM-dd")
             
-            // --- 时间戳 (Timestamp) ---
+            // --- Timestamp ---
             | :? TimestampArray as arr ->
                 let v = arr.GetValue(index).Value
                 let unit = (arr.Data.DataType :?> TimestampType).Unit
@@ -388,7 +353,7 @@ module Polars =
                 try DateTime.UnixEpoch.AddTicks(ticks).ToString("yyyy-MM-dd HH:mm:ss.ffffff")
                 with _ -> v.ToString()
 
-            // --- 时间 (Time) ---
+            // --- Time ---
             | :? Time32Array as arr ->
                 let v = arr.GetValue(index).Value
                 let unit = (arr.Data.DataType :?> Time32Type).Unit
@@ -407,7 +372,7 @@ module Polars =
                     | _ -> v * 10L
                 TimeSpan.FromTicks(ticks).ToString()
 
-            // --- 持续时间 (Duration) ---
+            // --- Duration ---
             | :? DurationArray as arr ->
                 let v = arr.GetValue(index).Value
                 let unit = (arr.Data.DataType :?> DurationType).Unit
@@ -420,7 +385,7 @@ module Polars =
                     | _ -> ""
                 sprintf "%d%s" v suffix
 
-            // --- 嵌套类型 (递归) ---
+            // --- List and Struct ---
             | :? ListArray as arr ->
                 let start = arr.ValueOffsets.[index]
                 let end_ = arr.ValueOffsets.[index + 1]
@@ -448,16 +413,12 @@ module Polars =
             | _ -> sprintf "<%s>" (col.GetType().Name)
 
     /// <summary>
-    /// [底层实现] 显式指定显示多少行。
-    /// 会先在 Rust 侧切片 (Head)，性能安全。
+    /// Show Rows of DataFrame, need to set row numbers.
     /// </summary>
     let showRows (rows: int) (df: DataFrame) : DataFrame =
-        // 1. 获取元数据 (零拷贝)
         let totalRows = df.Rows
         let n = Math.Min(int64 rows, totalRows)
-        
-        // 2. Rust 侧切片 (只拷贝 n 行数据到 C#)
-        // 如果 totalRows 很大，这步至关重要
+
         let previewDf = df |> head (int n)
         use batch = previewDf.ToArrow()
 
@@ -466,7 +427,6 @@ module Polars =
         
         for field in fields do
             let col = batch.Column(field.Name)
-            // 直接从 Schema 获取类型名，更准确
             let typeName = field.DataType.Name 
             
             printfn "[%s: %s]" field.Name typeName
@@ -482,8 +442,7 @@ module Polars =
         df
 
     /// <summary>
-    /// [快捷方式] 显示默认行数 (10行)。
-    /// 适合 REPL 或快速调试。
+    /// Show first 10 lines of DataFrame 
     /// </summary>
     let show (df: DataFrame) : DataFrame =
         showRows 10 df

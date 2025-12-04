@@ -3,7 +3,9 @@ namespace PolarsFSharp
 open System
 open Polars.Native
 open Apache.Arrow
-
+/// <summary>
+/// Polars data types for casting and schema definitions.
+/// </summary>
 type DataType =
     | Boolean
     | Int8 | Int16 | Int32 | Int64
@@ -36,7 +38,9 @@ type DataType =
         | Duration -> PlDataType.Duration
         | Binary -> PlDataType.Binary
         | Unknown -> PlDataType.Unknown
-
+/// <summary>
+/// Represents the type of join operation to perform.
+/// </summary>
 type JoinType =
     | Inner
     | Left
@@ -55,7 +59,9 @@ type JoinType =
         | Semi -> PlJoinType.Semi
         | Anti -> PlJoinType.Anti
 
-// F# 风格的 PivotAgg
+/// <summary>
+/// Specifies the aggregation function for pivot operations.
+/// </summary>
 type PivotAgg =
     | First | Sum | Min | Max | Mean | Median | Count | Last
     
@@ -69,25 +75,41 @@ type PivotAgg =
         | Median -> PlPivotAgg.Median
         | Count -> PlPivotAgg.Count
         | Last -> PlPivotAgg.Last
-// ==========================================
-// Expr 类型封装
-// ==========================================
+/// <summary>
+/// Represents a Polars Expression, which can be a column reference, a literal value, or a computation.
+/// </summary>
 type Expr(handle: ExprHandle) =
     member _.Handle = handle
     member internal this.CloneHandle() = PolarsWrapper.CloneExpr handle
-    // [新增] Cast
-    // 用法: col("age").Cast(DataType.Float64)
-    member this.Cast(dtype: DataType, ?strict: bool) =
-        let isStrict = defaultArg strict false
-        new Expr(PolarsWrapper.Cast(this.CloneHandle(), dtype.ToNative(), isStrict))
+
+    // --- Namespaces ---
+    /// <summary> Access naming operations (prefix/suffix). </summary>
+    member this.Name = new NameOps(this.CloneHandle())
+    /// <summary> Access list operations. </summary>
+    member this.List = new ListOps(this.CloneHandle())
+    /// <summary> Access struct operations. </summary>
+    member this.Struct = new StructOps(this.CloneHandle())
+    /// <summary> Access temporal (date/time) operations. </summary>
+    member this.Dt = new DtOps(handle)
+    /// <summary> Access string manipulation operations. </summary>
+    member this.Str = new StringOps(this.CloneHandle())
+
+
     // --- Helpers ---
     member this.Round(decimals: int) = new Expr(PolarsWrapper.Round(this.CloneHandle(), uint decimals))
-    // 运算符重载, Compare
+
+    // --- Operators ---
+    /// <summary> Greater than. </summary>
     static member (.>) (lhs: Expr, rhs: Expr) = new Expr(PolarsWrapper.Gt(lhs.Handle, rhs.Handle))
+    /// <summary> Less than. </summary>
     static member (.<) (lhs: Expr, rhs: Expr) = new Expr(PolarsWrapper.Lt(lhs.Handle, rhs.Handle))
+    /// <summary> Greater than or equal to. </summary>
     static member (.>=) (lhs: Expr, rhs: Expr) = new Expr(PolarsWrapper.GtEq(lhs.Handle, rhs.Handle))
+    /// <summary> Less than or equal to. </summary>
     static member (.<=) (lhs: Expr, rhs: Expr) = new Expr(PolarsWrapper.LtEq(lhs.Handle, rhs.Handle))
+    /// <summary> Equal to. </summary>
     static member (.==) (lhs: Expr, rhs: Expr) = new Expr(PolarsWrapper.Eq(lhs.Handle, rhs.Handle))
+    /// <summary> Not equal to. </summary>
     static member (.!=) (lhs: Expr, rhs: Expr) = new Expr(PolarsWrapper.Neq(lhs.Handle, rhs.Handle))
     // 运算符重载, Arithmetic
     static member ( + ) (lhs: Expr, rhs: Expr) = new Expr(PolarsWrapper.Add(lhs.Handle, rhs.Handle))
@@ -95,102 +117,88 @@ type Expr(handle: ExprHandle) =
     static member ( * ) (lhs: Expr, rhs: Expr) = new Expr(PolarsWrapper.Mul(lhs.Handle, rhs.Handle))
     static member ( / ) (lhs: Expr, rhs: Expr) = new Expr(PolarsWrapper.Div(lhs.Handle, rhs.Handle))
     static member ( % ) (lhs: Expr, rhs: Expr) = new Expr(PolarsWrapper.Rem(lhs.Handle, rhs.Handle))
+    /// <summary> Power / Exponentiation. </summary>
     static member (.**) (baseExpr: Expr, exponent: Expr) = baseExpr.Pow(exponent)
-    // --- 逻辑运算符 ---
-    // 使用 .&& 和 .|| 避免与 F# 的短路逻辑 && 冲突
+    /// <summary> Logical AND. </summary>
     static member (.&&) (lhs: Expr, rhs: Expr) = new Expr(PolarsWrapper.And(lhs.Handle, rhs.Handle))
+    /// <summary> Logical OR. </summary>
     static member (.||) (lhs: Expr, rhs: Expr) = new Expr(PolarsWrapper.Or(lhs.Handle, rhs.Handle))
-    // 逻辑非 (unary not) -> !expr
-    // F# 中一元非可以用 ~~ 或者自定义
-    static member (!!) (e: Expr) = new Expr(PolarsWrapper.Not(e.Handle))
-    // 方法
+    /// <summary> Logical NOT. </summary>
+    static member (!!) (e: Expr) = new Expr(PolarsWrapper.Not e.Handle)
+    // --- Methods ---
+    /// <summary> Rename the output column. </summary>
     member this.Alias(name: string) = new Expr(PolarsWrapper.Alias(handle, name))
-    member this.Sum() = new Expr(PolarsWrapper.Sum(handle))
-    member this.Mean() = new Expr(PolarsWrapper.Mean(handle))
-    member this.Max() = new Expr(PolarsWrapper.Max(handle))
-    member this.Min() = new Expr(PolarsWrapper.Min(handle))
-    member this.Abs() = new Expr(PolarsWrapper.Abs(handle))
-    // FillNull (填充空值)
-    // 
-    member this.FillNull(fillValue: Expr) = 
-        new Expr(PolarsWrapper.FillNull(this.CloneHandle(), fillValue.CloneHandle()))
 
-    // IsNull (检查是否为空)
-    member this.IsNull() = 
-        new Expr(PolarsWrapper.IsNull(this.CloneHandle()))
-
-    // IsNotNull
-    member this.IsNotNull() = 
-        new Expr(PolarsWrapper.IsNotNull(this.CloneHandle()))
-    // 基础 Pow: 接受 Expr
-    member this.Pow(exponent: Expr) = 
-        new Expr(PolarsWrapper.Pow(this.CloneHandle(), exponent.CloneHandle()))
-
-    // 重载 Pow: 方便用户直接传数字 (pow(2))
-    // 利用万能 lit 转换
-    member this.Pow(exponent: double) = 
-        this.Pow(PolarsWrapper.Lit(exponent) |> fun h -> new Expr(h)) // 这里偷懒直接调Wrapper构造临时Expr
-    member this.Pow(exponent: int) = 
-        this.Pow(PolarsWrapper.Lit(exponent) |> fun h -> new Expr(h))
+    /// <summary> Cast the expression to a different data type. </summary>
+    member this.Cast(dtype: DataType, ?strict: bool) =
+        let isStrict = defaultArg strict false
+        new Expr(PolarsWrapper.Cast(this.CloneHandle(), dtype.ToNative(), isStrict))
+    // Aggregations
+    member this.Sum() = new Expr(PolarsWrapper.Sum handle)
+    member this.Mean() = new Expr(PolarsWrapper.Mean handle)
+    member this.Max() = new Expr(PolarsWrapper.Max handle)
+    member this.Min() = new Expr(PolarsWrapper.Min handle)
+    // Math
+    member this.Abs() = new Expr(PolarsWrapper.Abs handle)
     member this.Sqrt() = new Expr(PolarsWrapper.Sqrt(this.CloneHandle()))
     member this.Exp() = new Expr(PolarsWrapper.Exp(this.CloneHandle()))
-    // [场景 1] 常数底数 (性能最好，直接调 Rust)
+    member this.Pow(exponent: Expr) = 
+        new Expr(PolarsWrapper.Pow(this.CloneHandle(), exponent.CloneHandle()))
+    member this.Pow(exponent: double) = 
+        this.Pow(PolarsWrapper.Lit exponent |> fun h -> new Expr(h))
+    member this.Pow(exponent: int) = 
+        this.Pow(PolarsWrapper.Lit exponent |> fun h -> new Expr(h))
+    /// <summary> Calculate the logarithm with the given base. </summary>
     member this.Log(baseVal: double) = 
         new Expr(PolarsWrapper.Log(this.CloneHandle(), baseVal))
-
-    // [场景 2] 动态底数 (Rust 的 log 不支持 Expr，我们用数学公式模拟)
-    // log_b(x) = ln(x) / ln(b)
     member this.Log(baseExpr: Expr) = 
         this.Ln() / baseExpr.Ln()
-
-    // 自然对数 (快捷方式)
+    /// <summary> Calculate the natural logarithm (base e). </summary>
     member this.Ln() = 
-        this.Log(Math.E)
+        this.Log Math.E
 
-    // --- Namespaces ---
-    member this.Name = new NameOps(this.CloneHandle())
-    member this.List = new ListOps(this.CloneHandle())
-    member this.Struct = new StructOps(this.CloneHandle())
-    // Explode
-    member this.Explode() = new Expr(PolarsWrapper.Explode(this.CloneHandle()))
-    // IsBetween
+    // Logic
+    /// <summary> Check if the value is between lower and upper bounds (inclusive). </summary>
     member this.IsBetween(lower: Expr, upper: Expr) =
         new Expr(PolarsWrapper.IsBetween(this.CloneHandle(), lower.CloneHandle(), upper.CloneHandle()))
-
+    member this.FillNull(fillValue: Expr) = 
+        new Expr(PolarsWrapper.FillNull(this.CloneHandle(), fillValue.CloneHandle()))
+    member this.IsNull() = 
+        new Expr(PolarsWrapper.IsNull(this.CloneHandle()))
+    member this.IsNotNull() = 
+        new Expr(PolarsWrapper.IsNotNull(this.CloneHandle()))
+    // UDF
+    /// <summary>
+    /// Apply a custom C# function (UDF) to the expression.
+    /// The function receives an Apache Arrow Array and returns an Arrow Array.
+    /// </summary>
     member this.Map(func: Func<IArrowArray, IArrowArray>) =
         new Expr(PolarsWrapper.Map(this.CloneHandle(), func))
     member this.Map(func: Func<IArrowArray, IArrowArray>, outputType: PlDataType) =
         new Expr(PolarsWrapper.Map(this.CloneHandle(), func, outputType))
-    member this.Dt = new DtOps(handle)
-    member this.Str = new StringOps(this.CloneHandle())
-
-    // Over
-    // 用法: col("salary").Sum().Over([col("dept")])
+    /// Advanced
+    /// <summary> Explode a list column into multiple rows. </summary>
+    member this.Explode() = new Expr(PolarsWrapper.Explode(this.CloneHandle()))
+    /// <summary> Apply a window function over specific partition columns. </summary>
     member this.Over(partitionBy: Expr list) =
-        // 1. 克隆主表达式
         let mainHandle = this.CloneHandle()
-        
-        // 2. 克隆分组列表
         let partHandles = partitionBy |> List.map (fun e -> e.CloneHandle()) |> List.toArray
-        
-        // 3. 调用 Wrapper
         new Expr(PolarsWrapper.Over(mainHandle, partHandles))
 
-    // 重载：方便只传一个分组列的情况
     member this.Over(partitionCol: Expr) =
         this.Over [partitionCol]
-    // Shift (平移)
+    // Shift
     member this.Shift(n: int64) = new Expr(PolarsWrapper.Shift(this.CloneHandle(), n))
-    // 默认 shift 1
+    // Default shift 1
     member this.Shift() = this.Shift(1L)
 
-    // Diff (差分)
+    // Diff
     member this.Diff(n: int64) = new Expr(PolarsWrapper.Diff(this.CloneHandle(), n))
-    // 默认 diff 1
+    // Default diff 1
     member this.Diff() = this.Diff 1L
 
-    // Fill (填充)
-    // limit: 0 表示无限填充
+    // Fill
+    // limit: 0 means fill infinitely
     member this.ForwardFill(?limit: int) = 
         let l = defaultArg limit 0
         new Expr(PolarsWrapper.ForwardFill(this.CloneHandle(), uint l))
@@ -199,7 +207,6 @@ type Expr(handle: ExprHandle) =
         let l = defaultArg limit 0
         new Expr(PolarsWrapper.BackwardFill(this.CloneHandle(), uint l))
     
-    // 别名
     member this.FillNullStrategy(strategy: string) =
         match strategy.ToLower() with
         | "forward" | "ffill" -> this.ForwardFill()
@@ -234,6 +241,7 @@ type Expr(handle: ExprHandle) =
         let c = defaultArg closed "left"
         new Expr(PolarsWrapper.RollingMinBy(this.CloneHandle(), windowSize, by.CloneHandle(), c))
 
+// --- Namespace Helpers ---
 
 and DtOps(handle: ExprHandle) =
     let wrap op = new Expr(op handle)
@@ -251,41 +259,32 @@ and DtOps(handle: ExprHandle) =
     member _.Date() = wrap PolarsWrapper.DtDate
     member _.Time() = wrap PolarsWrapper.DtTime
 
-    // 1. 指定格式转换
-    // 用法: col("date").Dt.ToString("%Y-%m-%d")
+    /// <summary> Format datetime to string using the given format string (strftime). </summary>
     member _.ToString(format: string) = 
         new Expr(PolarsWrapper.DtToString(handle, format)) // 注意这里 handle 是 Clone 进来的，Wrapper 会消耗它
 
-    // 2. [重载] 默认格式转换 (ISO 8601)
-    // 用法: col("date").Dt.ToString()
+    // col("date").Dt.ToString()
     member this.ToString() = 
         // 这是一个常见的 ISO 格式，或者你可以选择其他默认值
-        this.ToString("%Y-%m-%dT%H:%M:%S%.f")
+        this.ToString "%Y-%m-%dT%H:%M:%S%.f"
+
 and StringOps(handle: ExprHandle) =
-    // 内部帮助函数
     let wrap op = new Expr(op handle)
     
-    // 大小写
+    /// <summary> Convert to uppercase. </summary>
     member _.ToUpper() = wrap PolarsWrapper.StrToUpper
+    /// <summary> Convert to lowercase. </summary>
     member _.ToLower() = wrap PolarsWrapper.StrToLower
-    
-    // 长度
+    /// <summary> Get length in bytes. </summary>
     member _.Len() = wrap PolarsWrapper.StrLenBytes
-    
-    // 切片
     // F# uint64 = C# ulong
     member _.Slice(offset: int64, length: uint64) = 
         new Expr(PolarsWrapper.StrSlice(handle, offset, length))
-        
-    // 替换 (Replace All)
     member _.ReplaceAll(pattern: string, value: string, ?useRegex: bool) =
         let regex = defaultArg useRegex false
         new Expr(PolarsWrapper.StrReplaceAll(handle, pattern, value,regex))
-
     member _.Extract(pattern: string, groupIndex: int) =
         new Expr(PolarsWrapper.StrExtract(handle, pattern, uint groupIndex))
-
-    // 包含 (之前做的)
     member _.Contains(pat: string) = 
         new Expr(PolarsWrapper.StrContains(handle, pat))
     member _.Split(separator: string) = new Expr(PolarsWrapper.StrSplit(handle, separator))
@@ -304,139 +303,121 @@ and ListOps(handle: ExprHandle) =
     member _.Min() = new Expr(PolarsWrapper.ListMin(handle))
     member _.Max() = new Expr(PolarsWrapper.ListMax(handle))
     member _.Mean() = new Expr(PolarsWrapper.ListMean(handle))
-    
-    // Sort
     member _.Sort(descending: bool) = new Expr(PolarsWrapper.ListSort(handle, descending))
-    
     // Contains
     member _.Contains(item: Expr) : Expr = 
-        // 注意：item 也要 clone
         new Expr(PolarsWrapper.ListContains(handle, item.CloneHandle()))
-    // Contains 重载 (方便传字面量)
     member _.Contains(item: int) = 
-        // [修复] 变量名定义为 itemHandle，以便下一行使用
         let itemHandle = PolarsWrapper.Lit(item)
-        
-        // 为了最大安全性，建议 clone handle (列表本身)，消耗 itemHandle (元素)
         new Expr(PolarsWrapper.ListContains(PolarsWrapper.CloneExpr(handle), itemHandle))
-
-    // 3. 针对 string 的重载
     member _.Contains(item: string) = 
-        // [修复] 变量名一致
         let itemHandle = PolarsWrapper.Lit(item)
         new Expr(PolarsWrapper.ListContains(PolarsWrapper.CloneExpr(handle), itemHandle))
 
 and StructOps(handle: ExprHandle) =
-    // 取字段
+    /// <summary> Retrieve a field from the struct by name. </summary>
     member _.Field(name: string) = 
         new Expr(PolarsWrapper.StructFieldByName(handle, name))
+
+/// <summary>
+/// A column selection strategy (e.g., all columns, or specific columns).
+/// </summary>
 type Selector(handle: SelectorHandle) =
     member _.Handle = handle
     
     member internal this.CloneHandle() = 
         PolarsWrapper.CloneSelector(handle)
 
-    // Exclude 方法
+    /// <summary> Exclude columns from a wildcard selection (col("*")). </summary>
     member this.Exclude(names: string list) =
         let arr = List.toArray names
-        // 使用 CloneHandle，防止 this.Handle 被消耗
         new Selector(PolarsWrapper.SelectorExclude(this.CloneHandle(), arr))
 
     member this.ToExpr() =
-        // 转换也会消耗 Selector，所以要 Clone
         new Expr(PolarsWrapper.SelectorToExpr(this.CloneHandle()))
 
-// DataFrame 封装
+// --- Frames ---
+
+/// <summary>
+/// An eager DataFrame holding data in memory.
+/// </summary>
 type DataFrame(handle: DataFrameHandle) =
     interface IDisposable with
         member _.Dispose() = handle.Dispose()
     member this.Clone() = new DataFrame(PolarsWrapper.CloneDataFrame handle)
     member internal this.CloneHandle() = PolarsWrapper.CloneDataFrame handle
     member _.Handle = handle
-    
-    // 依然保留，用于 Show 或者用户真的需要 Arrow 数据时
-    member this.ToArrow() = PolarsWrapper.Collect(handle)
-
-    // 零拷贝获取行数
-    member _.Rows = PolarsWrapper.DataFrameHeight(handle)
-
-    // 零拷贝获取列数
-    member _.Columns = PolarsWrapper.DataFrameWidth(handle)
-    member _.ColumnNames = PolarsWrapper.GetColumnNames(handle) |> Array.toList
-
+    // Interop
+    member this.ToArrow() = PolarsWrapper.Collect handle
+    member _.Rows = PolarsWrapper.DataFrameHeight handle
+    member _.Columns = PolarsWrapper.DataFrameWidth handle
+    member _.ColumnNames = PolarsWrapper.GetColumnNames handle |> Array.toList
     member this.Item 
         with get(colName: string, rowIndex: int) =
-            // 默认返回 float (double)，因为最通用。
-            // 如果需要其他类型，可以使用下面的专用方法
             PolarsWrapper.GetDouble(handle, colName, int64 rowIndex)
-
-    // 专用取值方法
     member this.Int(colName: string, rowIndex: int) : int64 option = 
         let nullableVal = PolarsWrapper.GetInt(handle, colName, int64 rowIndex)
         if nullableVal.HasValue then Some nullableVal.Value else None
-
     member this.Float(colName: string, rowIndex: int) : float option = 
         let nullableVal = PolarsWrapper.GetDouble(handle, colName, int64 rowIndex)
         if nullableVal.HasValue then Some nullableVal.Value else None
     member this.String(colName: string, rowIndex: int) = PolarsWrapper.GetString(handle, colName, int64 rowIndex) |> Option.ofObj
-
     member this.StringList(colName: string, rowIndex: int) : string list option =
-        // 1. 获取该列的 Arrow Array
         use colHandle = PolarsWrapper.Select(handle, [| PolarsWrapper.Col(colName) |])
         use tempDf = new DataFrame(colHandle)
         use arrowBatch = tempDf.ToArrow()
         
-        let col = arrowBatch.Column(colName)
+        let col = arrowBatch.Column colName
         
-        // 内部辅助函数：从 Values 数组中提取字符串
         let extractStrings (valuesArr: IArrowArray) (startIdx: int) (endIdx: int) =
             match valuesArr with
             | :? StringArray as sa ->
                 [ for i in startIdx .. endIdx - 1 -> sa.GetString(i) ]
             | :? StringViewArray as sva ->
                 [ for i in startIdx .. endIdx - 1 -> sva.GetString(i) ]
-            | _ -> [] // 类型不匹配
+            | _ -> [] 
 
-        // 2. 解析 ListArray 或 LargeListArray
         match col with
-        // Case A: 标准 List (32-bit offsets)
+        // Case A: Arrow.ListArray 
         | :? Apache.Arrow.ListArray as listArr ->
-            if listArr.IsNull(rowIndex) then None
+            if listArr.IsNull rowIndex then None
             else
                 let start = listArr.ValueOffsets.[rowIndex]
                 let end_ = listArr.ValueOffsets.[rowIndex + 1]
                 Some (extractStrings listArr.Values start end_)
 
-        // Case B: [关键修复] Large List (64-bit offsets) - Polars 通常输出这个
+        // Case B: Large List (64-bit offsets) 
         | :? Apache.Arrow.LargeListArray as listArr ->
-            if listArr.IsNull(rowIndex) then None
+            if listArr.IsNull rowIndex then None
             else
                 // Offset 是 long，强转 int (单行 List 长度通常不会超过 20 亿)
-                let start = int (listArr.ValueOffsets.[rowIndex])
-                let end_ = int (listArr.ValueOffsets.[rowIndex + 1])
+                let start = int listArr.ValueOffsets.[rowIndex]
+                let end_ = int listArr.ValueOffsets.[rowIndex + 1]
                 Some (extractStrings listArr.Values start end_)
 
         | _ -> 
-            // 调试信息：如果未来 Polars 改用 ListViewArray，这里能看出来
             // System.Console.WriteLine($"[Debug] Mismatched Array Type: {col.GetType().Name}")
             None
 
-// LazyFrame 封装
-// 它依赖 DataFrame (Collect 返回 DataFrame)，所以必须定义在 DataFrame 后面
+/// <summary>
+/// A LazyFrame represents a logical plan of operations that will be optimized and executed only when collected.
+/// </summary>
 type LazyFrame(handle: LazyFrameHandle) =
     member _.Handle = handle
-    member internal this.CloneHandle() = PolarsWrapper.LazyClone(handle)
+    member internal this.CloneHandle() = PolarsWrapper.LazyClone handle
+    /// <summary> Execute the plan and return a DataFrame. </summary>
     member this.Collect() = 
-        let dfHandle = PolarsWrapper.LazyCollect(handle)
+        let dfHandle = PolarsWrapper.LazyCollect handle
         new DataFrame(dfHandle)
-    // 返回 JSON 字符串
-    member _.SchemaRaw = PolarsWrapper.GetSchemaString(handle)
+    /// <summary> Get the schema string of the LazyFrame without executing it. </summary>
+    member _.SchemaRaw = PolarsWrapper.GetSchemaString handle
 
-    // 返回 Map<string, string>
+    /// <summary> Get the schema of the LazyFrame without executing it. </summary>
     member _.Schema = 
-        let dict = PolarsWrapper.GetSchema(handle)
+        let dict = PolarsWrapper.GetSchema handle
         dict |> Seq.map (fun kv -> kv.Key, kv.Value) |> Map.ofSeq
 
+    /// <summary> Print the query plan. </summary>
     member this.Explain(?optimized: bool) = 
         let opt = defaultArg optimized true
         PolarsWrapper.Explain(handle, opt)
@@ -447,11 +428,10 @@ type SqlContext() =
     interface IDisposable with
         member _.Dispose() = handle.Dispose()
 
-    // 注册表
+    /// <summary> Register a LazyFrame as a table for SQL querying. </summary>
     member _.Register(name: string, lf: LazyFrame) =
-        // 同样，注册是 Move 操作，需要 CloneHandle
         PolarsWrapper.SqlRegister(handle, name, lf.CloneHandle())
 
-    // 执行查询
+    /// <summary> Execute a SQL query and return a LazyFrame. </summary>
     member _.Execute(query: string) =
         new LazyFrame(PolarsWrapper.SqlExecute(handle, query))
