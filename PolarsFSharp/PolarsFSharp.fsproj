@@ -12,6 +12,7 @@
     <Compile Include="Polars.fs" />
     <Compile Include="UdfUtils.fs" />
     <Compile Include="Extensions.fs" />
+    <Compile Include="Display.fs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -20,6 +21,7 @@
 
   <ItemGroup>
     <PackageReference Include="Apache.Arrow" Version="22.1.0" />
+    <PackageReference Include="Microsoft.DotNet.Interactive.Formatting" Version="1.0.0-beta.*" />
   </ItemGroup>
 
 </Project>
