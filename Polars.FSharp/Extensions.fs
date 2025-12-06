@@ -99,7 +99,7 @@ module Serialization =
             if col.IsNull(rowIndex) then
                 if isOption then valueNone
                 else if not coreType.IsValueType then null // 引用类型允许 null
-                else failwithf "Column '%s' has null at row %d but record field '%s' is not Option" (col.GetType().Name) rowIndex (targetType.Name)
+                else failwithf "Column '%s' has null at row %d but record field '%s' is not Option" (col.GetType().Name) rowIndex targetType.Name
             else
                 let raw = getRawValue rowIndex
                 // 类型转换 (例如 Arrow Int64 -> Record Int32)
@@ -208,10 +208,10 @@ module Serialization =
         /// [ToRecords] 将 DataFrame 转换为 F# Record 列表
         /// </summary>
         member this.ToRecords<'T>() : 'T list =
-            if not (FSharpType.IsRecord(typeof<'T>)) then
-                failwithf "Type '%s' is not an F# Record" (typeof<'T>.Name)
+            if not (FSharpType.IsRecord typeof<'T>) then
+                failwithf "Type '%s' is not an F# Record" typeof<'T>.Name
             
-            let props = FSharpType.GetRecordFields(typeof<'T>)
+            let props = FSharpType.GetRecordFields typeof<'T>
             
             // 全量转 Arrow (适合中小数据量实体化)
             use batch = this.ToArrow()
@@ -221,13 +221,13 @@ module Serialization =
             let columnReaders = 
                 props 
                 |> Array.map (fun prop -> 
-                    let col = batch.Column(prop.Name)
+                    let col = batch.Column prop.Name
                     if isNull col then failwithf "Column '%s' not found in DataFrame" prop.Name
                     
                     createColumnReader col prop.PropertyType
                 )
 
-            let result = ResizeArray<'T>(rowCount)
+            let result = ResizeArray<'T> rowCount
             let args = Array.zeroCreate<obj> columnReaders.Length
             
             for i in 0 .. rowCount - 1 do
@@ -243,10 +243,10 @@ module Serialization =
         /// [ofRecords] 从 F# Record 序列创建 DataFrame
         /// </summary>
         static member ofRecords<'T> (data: seq<'T>) : DataFrame =
-            if not (FSharpType.IsRecord(typeof<'T>)) then
-                failwithf "Type '%s' is not an F# Record" (typeof<'T>.Name)
+            if not (FSharpType.IsRecord typeof<'T>) then
+                failwithf "Type '%s' is not an F# Record" typeof<'T>.Name
 
-            let props = FSharpType.GetRecordFields(typeof<'T>)
+            let props = FSharpType.GetRecordFields typeof<'T>
             
             // 必须先物化 seq 以获取长度 (RecordBatch 需要)
             let items = Seq.toArray data
@@ -257,7 +257,7 @@ module Serialization =
             
             // 填充数据
             for item in items do
-                let values = FSharpValue.GetRecordFields(item)
+                let values = FSharpValue.GetRecordFields item
                 for i in 0 .. handlers.Length - 1 do
                     let (append, _, _) = handlers.[i]
                     append values.[i]
@@ -266,7 +266,7 @@ module Serialization =
             let fields = ResizeArray<Field>()
             let arrays = ResizeArray<IArrowArray>()
             
-            for (_, createField, buildArray) in handlers do
+            for _, createField, buildArray in handlers do
                 fields.Add(createField())
                 arrays.Add(buildArray())
 

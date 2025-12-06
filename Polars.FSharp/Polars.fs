@@ -299,7 +299,7 @@ module Polars =
     // --- Show / Helper ---
 
     let rec formatValue (col: IArrowArray) (index: int) : string =
-        if col.IsNull(index) then "null"
+        if col.IsNull index then "null"
         else
             match col with
             // --- Base numbers ---
