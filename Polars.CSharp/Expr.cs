@@ -344,6 +344,11 @@ public class Expr : IDisposable
     /// Access temporal (Date/Time) operations.
     /// </summary>
     public DtOps Dt => new DtOps(this);
+
+    /// <summary>
+    /// Access string manipulation operations.
+    /// </summary>
+    public StringOps Str => new StringOps(this);
     // ---------------------------------------------------
     // Clean Up
     // ---------------------------------------------------
@@ -474,4 +479,90 @@ public class DtOps
     /// </summary>
     /// <returns></returns>
     public Expr Time() => Wrap(PolarsWrapper.DtTime);
+}
+
+// ==========================================
+// StringOps Helper Class
+// ==========================================
+/// <summary>
+/// Offers multiple methods for checking and parsing elements of a string column.
+/// </summary>
+public class StringOps
+{
+    private readonly Expr _expr;
+    internal StringOps(Expr expr) { _expr = expr; }
+
+    // 辅助函数：Clone 并调用
+    private Expr Wrap(Func<ExprHandle, ExprHandle> op)
+    {
+        var h = PolarsWrapper.CloneExpr(_expr.Handle);
+        return new Expr(op(h));
+    }
+    /// <summary>
+    /// Transfer String to UpperClass.
+    /// </summary>
+    public Expr ToUpper() => Wrap(PolarsWrapper.StrToUpper);
+    /// <summary>
+    /// Transfer String to LowerClass.
+    /// </summary>
+    public Expr ToLower() => Wrap(PolarsWrapper.StrToLower);
+    
+    /// <summary>
+    /// Get length in bytes.
+    /// </summary>
+    public Expr Len() => Wrap(PolarsWrapper.StrLenBytes);
+    /// <summary>
+    /// Slice string by length.
+    /// </summary>
+    /// <param name="offset"></param>
+    /// <param name="length"></param>
+    /// <returns></returns>
+    public Expr Slice(long offset, ulong length)
+    {
+        var h = PolarsWrapper.CloneExpr(_expr.Handle);
+        return new Expr(PolarsWrapper.StrSlice(h, offset, length));
+    }
+    /// <summary>
+    /// Replace charaters in a string.
+    /// </summary>
+    /// <param name="pattern"></param>
+    /// <param name="value"></param>
+    /// <param name="useRegex"></param>
+    /// <returns></returns>
+    public Expr ReplaceAll(string pattern, string value, bool useRegex = false)
+    {
+        var h = PolarsWrapper.CloneExpr(_expr.Handle);
+        return new Expr(PolarsWrapper.StrReplaceAll(h, pattern, value, useRegex));
+    }
+    /// <summary>
+    /// Extract charaters in string by Regex.
+    /// </summary>
+    /// <param name="pattern"></param>
+    /// <param name="groupIndex"></param>
+    /// <returns></returns>
+    public Expr Extract(string pattern, uint groupIndex)
+    {
+        var h = PolarsWrapper.CloneExpr(_expr.Handle);
+        return new Expr(PolarsWrapper.StrExtract(h, pattern, groupIndex));
+    }
+    /// <summary>
+    /// Check if the string contains a substring that matches a pattern.
+    /// </summary>
+    /// <param name="pattern"></param>
+    /// <returns></returns>
+    public Expr Contains(string pattern)
+    {
+        var h = PolarsWrapper.CloneExpr(_expr.Handle);
+        return new Expr(PolarsWrapper.StrContains(h, pattern));
+    }
+    /// <summary>
+    /// Split the string by a substring.
+    /// </summary>
+    /// <param name="separator"></param>
+    /// <returns></returns>
+    public Expr Split(string separator)
+    {
+         var h = PolarsWrapper.CloneExpr(_expr.Handle);
+         return new Expr(PolarsWrapper.StrSplit(h, separator));
+    }
 }

@@ -237,4 +237,73 @@ TooShort,1990-05-20,1.60";
         double aliceSqrt = sqrtCol.GetValue(0) ?? 0.0;
         Assert.True(aliceSqrt > 1.28 && aliceSqrt < 1.29);
     }
+    // ==========================================
+    // String Operations
+    // ==========================================
+
+    [Fact]
+    public void String_Operations_Case_Slice_Replace()
+    {
+        // 脏数据: "Hello World", "foo BAR"
+        using var csv = new DisposableCsv("text\nHello World\nfoo BAR");
+        using var df = DataFrame.ReadCsv(csv.Path);
+
+        using var res = df.Select(
+            Col("text"),
+            
+            // 1. 转大写
+            Col("text").Str.ToUpper().Alias("upper"),
+            
+            // 2. 切片 (取前 3 个字符)
+            Col("text").Str.Slice(0, 3).Alias("slice"),
+            
+            // 3. 替换 (把 'o' 换成 '0')
+            Col("text").Str.ReplaceAll("o", "0").Alias("replaced"),
+            
+            // 4. 长度
+            Col("text").Str.Len().Alias("len")
+        );
+
+        using var batch = res.ToArrow();
+
+        // 验证 Row 0: "Hello World"
+        Assert.Equal("HELLO WORLD", batch.Column("upper").GetStringValue(0));
+        Assert.Equal("Hel", batch.Column("slice").GetStringValue(0));
+        Assert.Equal("Hell0 W0rld", batch.Column("replaced").GetStringValue(0));
+        
+        // Polars len() 返回的是 u32，我们的 GetInt64Value 会处理转换
+        Assert.Equal(11, batch.Column("len").GetInt64Value(0)); 
+
+        // 验证 Row 1: "foo BAR"
+        Assert.Equal("FOO BAR", batch.Column("upper").GetStringValue(1));
+        Assert.Equal("foo", batch.Column("slice").GetStringValue(1));
+    }
+
+    [Fact]
+    public void String_Regex_Replace_And_Extract()
+    {
+        using var csv = new DisposableCsv("text\nUser: 12345\nID: 999");
+        using var df = DataFrame.ReadCsv(csv.Path);
+
+        using var res = df.Select(
+            // 1. Regex Replace: 把数字换成 #
+            // C# 字符串中反斜杠需要转义，所以写 "\\d+" 或者 @"\d+"
+            Col("text").Str.ReplaceAll(@"\d+", "#", useRegex: true).Alias("masked"),
+            
+            // 2. Regex Extract: 提取数字部分
+            // @"(\d+)" 是第 1 组
+            Col("text").Str.Extract(@"(\d+)", 1).Alias("extracted_id")
+        );
+
+        using var batch = res.ToArrow();
+
+        // 验证 Replace
+        // "User: 12345" -> "User: #"
+        Assert.Equal("User: #", batch.Column("masked").GetStringValue(0));
+        
+        // 验证 Extract
+        // "User: 12345" -> "12345"
+        Assert.Equal("12345", batch.Column("extracted_id").GetStringValue(0));
+        Assert.Equal("999", batch.Column("extracted_id").GetStringValue(1));
+    }
 }
