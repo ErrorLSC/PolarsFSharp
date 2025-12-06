@@ -200,4 +200,41 @@ TooShort,1990-05-20,1.60";
         using var batch = res.ToArrow();
         Assert.Equal("Qinglei", batch.Column("name").GetStringValue(0));
     }
+    [Fact]
+    public void Math_Ops_BMI_Calculation_With_Pow()
+    {
+        // 构造数据: 身高(m), 体重(kg)
+        using var csv = new DisposableCsv("name,height,weight\nAlice,1.65,60\nBob,1.80,80");
+        using var df = DataFrame.ReadCsv(csv.Path);
+
+        // 目标逻辑: weight / (height ^ 2)
+        // C# 使用 .Pow(2) 代替 ** 2
+        var bmiExpr = (Col("weight") / Col("height").Pow(2))
+            .Alias("bmi");
+
+        using var res = df.Select(
+            Col("name"),
+            bmiExpr,
+            // 顺便测一下 sqrt: sqrt(height)
+            Col("height").Sqrt().Alias("sqrt_h")
+        );
+
+        using var batch = res.ToArrow();
+
+        // 验证 Bob 的 BMI: 80 / 1.8^2 = 24.691358...
+        // Bob 是第二行 (index 1)
+        var bmiCol = batch.Column("bmi") as DoubleArray;
+        Assert.NotNull(bmiCol);
+        
+        double bobBmi = bmiCol.GetValue(1) ?? 0.0;
+        Assert.True(bobBmi > 24.69 && bobBmi < 24.70);
+
+        // 验证 Alice 的 Sqrt: sqrt(1.65) = 1.2845...
+        // Alice 是第一行 (index 0)
+        var sqrtCol = batch.Column("sqrt_h") as DoubleArray;
+        Assert.NotNull(sqrtCol);
+
+        double aliceSqrt = sqrtCol.GetValue(0) ?? 0.0;
+        Assert.True(aliceSqrt > 1.28 && aliceSqrt < 1.29);
+    }
 }

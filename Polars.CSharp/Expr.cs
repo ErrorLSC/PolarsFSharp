@@ -230,6 +230,64 @@ public class Expr : IDisposable
         return new Expr(PolarsWrapper.Abs(cloned));
     }
 
+    /// <summary>
+    /// Calculate the square root of the expression.
+    /// </summary>
+    public Expr Sqrt()
+    {
+        var e = PolarsWrapper.CloneExpr(Handle);
+        return new Expr(PolarsWrapper.Sqrt(e));
+    }
+
+    /// <summary>
+    /// Calculate the power of the expression with a given exponent expression.
+    /// </summary>
+    public Expr Pow(Expr exponent)
+    {
+        var b = PolarsWrapper.CloneExpr(Handle);
+        var e = PolarsWrapper.CloneExpr(exponent.Handle);
+        return new Expr(PolarsWrapper.Pow(b, e));
+    }
+
+    /// <summary>
+    /// Calculate the power of the expression with a given numeric exponent.
+    /// </summary>
+    public Expr Pow(double exponent)
+    {
+        var b = PolarsWrapper.CloneExpr(Handle);
+        var e = PolarsWrapper.Lit(exponent); 
+        return new Expr(PolarsWrapper.Pow(b, e));
+    }
+
+    /// <summary>
+    /// Calculate the power of the Euler's number.
+    /// </summary>
+    public Expr Exp()
+    {
+        var e = PolarsWrapper.CloneExpr(Handle);
+        return new Expr(PolarsWrapper.Exp(e));
+    }
+    /// <summary>
+    /// Calculate the ln of Number 
+    /// </summary>
+    /// <param name="baseVal"></param>
+    /// <returns></returns>
+    public Expr Ln(double baseVal = Math.E)
+    {
+        var e = PolarsWrapper.CloneExpr(Handle);
+        return new Expr(PolarsWrapper.Log(e, baseVal));
+    }
+    /// <summary>
+    /// Round the number
+    /// </summary>
+    /// <param name="decimals"></param>
+    /// <returns></returns>
+    public Expr Round(uint decimals)
+    {
+        var e = PolarsWrapper.CloneExpr(Handle);
+        return new Expr(PolarsWrapper.Round(e, decimals));
+    }
+
     // ==========================================
     // Null Handling
     // ==========================================
