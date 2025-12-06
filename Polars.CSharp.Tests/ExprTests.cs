@@ -306,4 +306,73 @@ TooShort,1990-05-20,1.60";
         Assert.Equal("12345", batch.Column("extracted_id").GetStringValue(0));
         Assert.Equal("999", batch.Column("extracted_id").GetStringValue(1));
     }
+    // ==========================================
+    // Temporal Ops (Components, Format, Cast)
+    // ==========================================
+    [Fact]
+    public void Temporal_Ops_Components_Format_Cast()
+    {
+        // 构造数据: 包含日期和时间的字符串
+        // Row 0: 2023年圣诞节下午3点半 (周一)
+        // Row 1: 2024年元旦零点 (周一)
+        var csvContent = "ts\n2023-12-25 15:30:00\n2024-01-01 00:00:00";
+        using var csv = new DisposableCsv(csvContent);
+
+        // [关键] 开启 tryParseDates=true，让 Polars 自动解析为 Datetime 类型
+        using var df = DataFrame.ReadCsv(csv.Path, tryParseDates: true);
+
+        using var res = df.Select(
+            Col("ts"),
+
+            // 1. 提取组件 (Components)
+            Col("ts").Dt.Year().Alias("y"),
+            Col("ts").Dt.Month().Alias("m"),
+            Col("ts").Dt.Day().Alias("d"),
+            Col("ts").Dt.Hour().Alias("h"),
+            
+            // Polars 定义: Monday=1, Sunday=7
+            Col("ts").Dt.Weekday().Alias("w_day"),
+            
+            // 2. 格式化 (Format to String)
+            // 测试自定义格式: "2023/12/25"
+            Col("ts").Dt.ToString("%Y/%m/%d").Alias("fmt_custom"),
+            
+            // 3. 类型转换 (Cast to Date)
+            // Datetime (含时分秒) -> Date (只含日期)
+            // 这一步依赖我们在 Wrapper.Expr.cs 中添加了 DtDate 绑定
+            Col("ts").Dt.Date().Alias("date_only")
+        );
+
+        // 验证结果
+        using var batch = res.ToArrow();
+
+        // --- 验证 Row 0: 2023-12-25 15:30:00 ---
+        
+        // 年月日 (Polars 返回的是 Int32，我们的 GetInt64Value 会自动兼容)
+        Assert.Equal(2023, batch.Column("y").GetInt64Value(0));
+        Assert.Equal(12, batch.Column("m").GetInt64Value(0));
+        Assert.Equal(25, batch.Column("d").GetInt64Value(0));
+        
+        // 小时
+        Assert.Equal(15, batch.Column("h").GetInt64Value(0));
+        
+        // 星期 (2023-12-25 是周一，Polars weekday 1-7)
+        Assert.Equal(1, batch.Column("w_day").GetInt64Value(0));
+
+        // 格式化字符串验证
+        // 这里验证 .Dt.ToString() 是否生效
+        Assert.Equal("2023/12/25", batch.Column("fmt_custom").GetStringValue(0));
+
+        // Date 类型验证
+        // 这里验证 .Dt.Date() 是否成功把 Datetime 转成了 Date32
+        // 我们在 ArrowExtensions.cs 里写的 FormatValue 会把 Date32 渲染为 "yyyy-MM-dd"
+        // 且不包含时分秒
+        var dateCol = batch.Column("date_only");
+        Assert.Equal("2023-12-25", dateCol.FormatValue(0));
+
+        // --- 验证 Row 1: 2024-01-01 00:00:00 ---
+        Assert.Equal(2024, batch.Column("y").GetInt64Value(1));
+        Assert.Equal(1, batch.Column("m").GetInt64Value(1));
+        Assert.Equal(0, batch.Column("h").GetInt64Value(1)); // 零点
+    }
 }

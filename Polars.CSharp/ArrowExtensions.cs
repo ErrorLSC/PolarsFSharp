@@ -104,10 +104,17 @@ public static class ArrowExtensions
         if (array.IsNull(index)) return null;
         return array switch
         {
-            Int64Array i64 => i64.GetValue(index),
+            // Signed Integes
+            Int8Array  i8  => i8.GetValue(index),   // Polars Month/Day/Weekday is Int8
+            Int16Array i16 => i16.GetValue(index),
             Int32Array i32 => i32.GetValue(index),
-            UInt64Array u64 => (long?)u64.GetValue(index),
+            Int64Array i64 => i64.GetValue(index),
+            
+            // Unsigned Integers (注意 UInt64 转 long 可能溢出为负数，但在常规数值处理中通常够用)
+            UInt8Array  u8  => u8.GetValue(index),
+            UInt16Array u16 => u16.GetValue(index),
             UInt32Array u32 => u32.GetValue(index),
+            UInt64Array u64 => (long?)u64.GetValue(index),
             _ => null
         };
     }

@@ -470,12 +470,12 @@ public class DtOps
     }
 
     /// <summary>
-    /// Warp Date to Expr
+    /// Cast to Date (remove time component).
     /// </summary>
     /// <returns></returns>
     public Expr Date() => Wrap(PolarsWrapper.DtDate);
     /// <summary>
-    /// Warp Time to Expr
+    /// Cast to Time (remove Date component).
     /// </summary>
     /// <returns></returns>
     public Expr Time() => Wrap(PolarsWrapper.DtTime);
