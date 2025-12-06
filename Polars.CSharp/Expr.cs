@@ -349,7 +349,7 @@ public class Expr : IDisposable
         return new Expr(PolarsWrapper.Cast(h, dtype.ToNative(), strict));
     }
     // ==========================================
-    // Namespaces (子空间操作)
+    // Namespaces
     // ==========================================
 
     /// <summary>
@@ -361,6 +361,16 @@ public class Expr : IDisposable
     /// Access string manipulation operations.
     /// </summary>
     public StringOps Str => new StringOps(this);
+
+    /// <summary>
+    /// Access list operations.
+    /// </summary>
+    public ListOps List => new ListOps(this);
+
+    /// <summary>
+    /// Access struct operations.
+    /// </summary>
+    public StructOps Struct => new StructOps(this);
     // ---------------------------------------------------
     // Clean Up
     // ---------------------------------------------------
@@ -576,5 +586,84 @@ public class StringOps
     {
          var h = PolarsWrapper.CloneExpr(_expr.Handle);
          return new Expr(PolarsWrapper.StrSplit(h, separator));
+    }
+}
+
+// ==========================================
+// ListOps Helper Class
+// ==========================================
+/// <summary>
+/// Offers methods for list operations.
+/// </summary>
+public class ListOps
+{
+    private readonly Expr _expr;
+    internal ListOps(Expr expr) { _expr = expr; }
+
+    private Expr Wrap(Func<ExprHandle, ExprHandle> op)
+    {
+        var h = PolarsWrapper.CloneExpr(_expr.Handle);
+        return new Expr(op(h));
+    }
+    /// <summary>
+    /// Get the first element of the list.
+    /// </summary>
+    /// <returns></returns>
+    public Expr First() => Wrap(PolarsWrapper.ListFirst);
+    /// <summary>
+    /// Get the last element of the list.
+    /// </summary>
+    /// <param name="index"></param>
+    /// <returns></returns>
+    public Expr Get(int index) 
+    {
+        var h = PolarsWrapper.CloneExpr(_expr.Handle);
+        return new Expr(PolarsWrapper.ListGet(h, index));
+    }
+    /// <summary>
+    /// Get the length of the list.
+    /// </summary>
+    /// <returns></returns>
+    public Expr Len() => Wrap(PolarsWrapper.ListLen);
+    /// <summary>
+    /// Join the list elements into a single string with a separator.
+    /// </summary>
+    /// <param name="separator"></param>
+    /// <returns></returns>
+    public Expr Join(string separator)
+    {
+        var h = PolarsWrapper.CloneExpr(_expr.Handle);
+        return new Expr(PolarsWrapper.ListJoin(h, separator));
+    }
+    /// <summary>
+    /// Sort the list elements.
+    /// </summary>
+    /// <param name="descending"></param>
+    /// <returns></returns>
+    public Expr Sort(bool descending)
+    {
+        var h = PolarsWrapper.CloneExpr(_expr.Handle);
+        return new Expr(PolarsWrapper.ListSort(h, descending));
+    }
+}
+
+// ==========================================
+// StructOps Helper Class
+// ==========================================
+/// <summary>
+/// Offers methods for accessing fields within struct columns.
+/// </summary>
+public class StructOps
+{
+    private readonly Expr _expr;
+    internal StructOps(Expr expr) { _expr = expr; }
+
+    /// <summary>
+    /// Retrieve a field from the struct by name.
+    /// </summary>
+    public Expr Field(string name)
+    {
+        var h = PolarsWrapper.CloneExpr(_expr.Handle);
+        return new Expr(PolarsWrapper.StructFieldByName(h, name));
     }
 }

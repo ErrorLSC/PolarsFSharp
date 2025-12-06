@@ -450,4 +450,49 @@ TooShort,1990-05-20,1.60";
         // Charlie (50) -> Fail
         Assert.Equal("Fail", gradeCol.GetStringValue(2));
     }
+    // ==========================================
+    // Struct and Advanced List Ops
+    // ==========================================
+    [Fact]
+    public void Struct_And_Advanced_List_Ops()
+    {
+        // 构造数据: Alice 考了两次试
+        using var csv = new DisposableCsv("name,score1,score2\nAlice,80,90\nBob,60,70");
+        using var df = DataFrame.ReadCsv(csv.Path);
+
+        // 逻辑 4 的表达式: "1 5 2" -> Split -> Sort(Desc) -> First
+        // 结果应该是 "5"
+        var maxCharExpr = Col("raw_nums").Str.Split(" ")
+            .List.Sort(descending: true)
+            .List.First()
+            .Alias("max_char");
+
+        using var res = df
+            // 1. Struct 测试: 把 score1, score2 打包成 "scores_struct"
+            .WithColumns(
+                AsStruct(Col("score1"), Col("score2"))
+                .Alias("scores_struct")
+            )
+            // 2. Struct Field 测试: 从 struct 取出 score1
+            .WithColumns(
+                Col("scores_struct").Struct.Field("score1").Alias("s1_extracted")
+            )
+            // 3. 造一个字符串列 "1 5 2" 用于 List 测试
+            .WithColumns(
+                Lit("1 5 2").Alias("raw_nums")
+            )
+            // 4. 执行 List 复杂操作
+            .WithColumns(maxCharExpr);
+
+        // 验证
+        using var batch = res.ToArrow();
+
+        // 验证 Struct Field
+        // Alice score1 = 80
+        Assert.Equal(80, batch.Column("s1_extracted").GetInt64Value(0));
+
+        // 验证 List Sort + First
+        // "1 5 2" -> ["1", "5", "2"] -> Sort Desc -> ["5", "2", "1"] -> First -> "5"
+        Assert.Equal("5", batch.Column("max_char").GetStringValue(0));
+    }
 }

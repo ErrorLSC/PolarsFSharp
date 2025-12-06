@@ -3,7 +3,7 @@ using Polars.Native;
 namespace Polars.CSharp;
 
 /// <summary>
-/// Polars C# API 的主要入口点。
+/// Polars Static Helpers
 /// </summary>
 public static class Polars
 {
@@ -31,7 +31,6 @@ public static class Polars
     /// <returns></returns>
     public static Expr All()
     {
-        // 假设 Wrapper 有 Col("*") 或者专门的 All 绑定
         return Col("*"); 
     }
 
@@ -76,5 +75,18 @@ public static class Polars
         var f = PolarsWrapper.CloneExpr(falseExpr.Handle);
         
         return new Expr(PolarsWrapper.IfElse(p, t, f));
+    }
+    // ==========================================
+    // Struct Operations
+    // ==========================================
+
+    /// <summary>
+    /// Combine multiple expressions into a Struct expression.
+    /// </summary>
+    public static Expr AsStruct(params Expr[] exprs)
+    {
+        // 必须 Clone 所有输入的 Handle，因为 Wrapper 会消耗它们
+        var handles = exprs.Select(e => PolarsWrapper.CloneExpr(e.Handle)).ToArray();
+        return new Expr(PolarsWrapper.AsStruct(handles));
     }
 }

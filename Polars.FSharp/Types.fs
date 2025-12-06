@@ -363,7 +363,7 @@ type DataFrame(handle: DataFrameHandle) =
         if nullableVal.HasValue then Some nullableVal.Value else None
     member this.String(colName: string, rowIndex: int) = PolarsWrapper.GetString(handle, colName, int64 rowIndex) |> Option.ofObj
     member this.StringList(colName: string, rowIndex: int) : string list option =
-        use colHandle = PolarsWrapper.Select(handle, [| PolarsWrapper.Col(colName) |])
+        use colHandle = PolarsWrapper.Select(handle, [| PolarsWrapper.Col colName |])
         use tempDf = new DataFrame(colHandle)
         use arrowBatch = tempDf.ToArrow()
         
@@ -421,7 +421,9 @@ type LazyFrame(handle: LazyFrameHandle) =
     member this.Explain(?optimized: bool) = 
         let opt = defaultArg optimized true
         PolarsWrapper.Explain(handle, opt)
-
+/// <summary>
+/// SQL Context for executing SQL queries on registered LazyFrames.
+/// </summary>
 type SqlContext() =
     let handle = PolarsWrapper.SqlContextNew()
     

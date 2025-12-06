@@ -14,9 +14,8 @@ public class DataFrame : IDisposable
     {
         Handle = handle;
     }
-
     // ==========================================
-    // 工厂方法 (IO) - 对应 Wrappers.IO.cs
+    // Static IO Read
     // ==========================================
     /// <summary>
     /// Read CSV File
@@ -61,7 +60,7 @@ public class DataFrame : IDisposable
     }
 
     /// <summary>
-    /// 从 Apache Arrow RecordBatch 创建 DataFrame (Zero-Copy 可能)
+    /// Create DataFrame from Arrow RecordBatch
     /// </summary>
     public static DataFrame FromArrow(RecordBatch batch)
     {
@@ -70,7 +69,7 @@ public class DataFrame : IDisposable
     }
 
     // ==========================================
-    // 属性与元数据
+    // Properties
     // ==========================================
     /// <summary>
     /// Return DataFrame Height
@@ -94,7 +93,7 @@ public class DataFrame : IDisposable
     }
 
     // ==========================================
-    // 核心操作 (Filter, Select, etc.)
+    // DataFrame Operations
     // ==========================================
     /// <summary>
     /// Select columns
@@ -166,10 +165,10 @@ public class DataFrame : IDisposable
     }
 
     // ==========================================
-    // Join & Concat
+    // Combining DataFrames
     // ==========================================
     /// <summary>
-    /// Join two DataFrames into one. 
+    /// Join with another DataFrame
     /// </summary>
     /// <param name="other"></param>
     /// <param name="leftOn"></param>
@@ -178,8 +177,6 @@ public class DataFrame : IDisposable
     /// <returns></returns>
     public DataFrame Join(DataFrame other, Expr leftOn, Expr rightOn, JoinType how = JoinType.Inner)
     {
-        // 需要 Clone Expr Handle
-        // 需要将 High-Level Enum 转换为 Native Enum
         var lOn = new[] { PolarsWrapper.CloneExpr(leftOn.Handle) };
         var rOn = new[] { PolarsWrapper.CloneExpr(rightOn.Handle) };
         
@@ -189,11 +186,11 @@ public class DataFrame : IDisposable
             other.Handle, 
             lOn, 
             rOn, 
-            how.ToNative() // 需定义扩展方法或转换逻辑
+            how.ToNative()
         ));
     }
     /// <summary>
-    /// Concat two DataFrame into one.
+    /// Concatenate multiple DataFrames vertically.
     /// </summary>
     /// <param name="dfs"></param>
     /// <returns></returns>
