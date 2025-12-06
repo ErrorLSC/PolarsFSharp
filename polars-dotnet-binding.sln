@@ -5,9 +5,9 @@ VisualStudioVersion = 18.0.11222.15 d18.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Polars.Native", "Polars.Native\Polars.Native.csproj", "{FF8588F0-C282-D416-071E-8B5CE79A0AD0}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "PolarsFSharp", "PolarsFSharp\PolarsFSharp.fsproj", "{6B3D319F-300E-4EE1-9980-9C2B930928B6}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Polars.FSharp", "Polars.FSharp\Polars.FSharp.fsproj", "{6B3D319F-300E-4EE1-9980-9C2B930928B6}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "PolarsFSharp.Tests", "PolarsFSharp.Tests\PolarsFSharp.Tests.fsproj", "{9D8BC8A3-8016-4A80-A509-8A02C81D6CAF}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Polars.FSharp.Tests", "PolarsFSharp.Tests\PolarsFSharp.Tests.fsproj", "{9D8BC8A3-8016-4A80-A509-8A02C81D6CAF}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

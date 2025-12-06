@@ -28,7 +28,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\PolarsFSharp\PolarsFSharp.fsproj" />
+    <ProjectReference Include="..\Polars.FSharp\Polars.FSharp.fsproj" />
   </ItemGroup>
 
   <PropertyGroup>
