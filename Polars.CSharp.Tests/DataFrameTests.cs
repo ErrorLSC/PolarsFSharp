@@ -195,34 +195,88 @@ Bob,2024,History";
         Assert.Equal(0, bobCheck.Height);
     }
     // ==========================================
-    // Concat Tests
+    // Concat Tests (Vertical, Horizontal, Diagonal)
     // ==========================================
     [Fact]
-    public void Test_Concat()
+    public void Test_Concat_All_Types()
     {
-        // 构造两个结构相同的 DataFrame
-        using var csv1 = new DisposableCsv("id,name\n1,Alice\n2,Bob");
-        using var df1 = DataFrame.ReadCsv(csv1.Path);
+        // --- 1. Vertical (垂直拼接) ---
+        // 场景：两份数据结构相同，上下堆叠
+        {
+            using var csv1 = new DisposableCsv("id,name\n1,Alice");
+            using var df1 = DataFrame.ReadCsv(csv1.Path);
 
-        using var csv2 = new DisposableCsv("id,name\n3,Charlie\n4,David");
-        using var df2 = DataFrame.ReadCsv(csv2.Path); 
+            using var csv2 = new DisposableCsv("id,name\n2,Bob");
+            using var df2 = DataFrame.ReadCsv(csv2.Path);
 
-        // 执行垂直拼接
-        using var concatenated = DataFrame.Concat([df1, df2]);
-        // 验证结果
-        Assert.Equal(4, concatenated.Height); // 应该有4行
-        Assert.Equal(2, concatenated.Width);  // 仍然是2列
+            using var res = DataFrame.Concat(new[] { df1, df2 }, ConcatType.Vertical);
 
-        using var batch = concatenated.ToArrow();
-        // 验证具体值
-        Assert.Equal(1, batch.Column("id").GetInt64Value(0));
-        Assert.Equal("Alice", batch.Column("name").GetStringValue(0));
-        Assert.Equal(2, batch.Column("id").GetInt64Value(1));
-        Assert.Equal("Bob", batch.Column("name").GetStringValue(1));
-        Assert.Equal(3, batch.Column("id").GetInt64Value(2));
-        Assert.Equal("Charlie", batch.Column("name").GetStringValue(2));
-        Assert.Equal(4, batch.Column("id").GetInt64Value(3));
-        Assert.Equal("David", batch.Column("name").GetStringValue(3));
+            Assert.Equal(2, res.Height);
+            Assert.Equal(2, res.Width);
+
+            using var batch = res.ToArrow();
+            // 验证顺序
+            Assert.Equal(1, batch.Column("id").GetInt64Value(0));
+            Assert.Equal(2, batch.Column("id").GetInt64Value(1));
+        }
+
+        // --- 2. Horizontal (水平拼接) ---
+        // 场景：行数相同，列不同，左右拼接
+        {
+            using var csv1 = new DisposableCsv("id\n1\n2");
+            using var df1 = DataFrame.ReadCsv(csv1.Path);
+
+            using var csv2 = new DisposableCsv("name,age\nAlice,20\nBob,30");
+            using var df2 = DataFrame.ReadCsv(csv2.Path);
+
+            using var res = DataFrame.Concat(new[] { df1, df2 }, ConcatType.Horizontal);
+
+            Assert.Equal(2, res.Height);
+            Assert.Equal(3, res.Width); // id + name + age
+
+            using var batch = res.ToArrow();
+            Assert.NotNull(batch.Column("id"));
+            Assert.NotNull(batch.Column("name"));
+            Assert.NotNull(batch.Column("age"));
+            
+            // 验证数据对齐
+            Assert.Equal(1, batch.Column("id").GetInt64Value(0));
+            Assert.Equal("Alice", batch.Column("name").GetStringValue(0));
+        }
+
+        // --- 3. Diagonal (对角拼接) ---
+        // 场景：列不完全对齐，取并集，空缺填 null
+        // DF1: [A, B]
+        // DF2: [B, C]
+        // Result: [A, B, C]
+        {
+            using var csv1 = new DisposableCsv("A,B\n1,10");
+            using var df1 = DataFrame.ReadCsv(csv1.Path);
+
+            using var csv2 = new DisposableCsv("B,C\n20,300");
+            using var df2 = DataFrame.ReadCsv(csv2.Path);
+
+            using var res = DataFrame.Concat(new[] { df1, df2 }, ConcatType.Diagonal);
+
+            Assert.Equal(2, res.Height); // 垂直堆叠
+            Assert.Equal(3, res.Width);  // A, B, C (列的并集)
+
+            using var batch = res.ToArrow();
+            
+            var colA = batch.Column("A");
+            var colB = batch.Column("B");
+            var colC = batch.Column("C");
+
+            // Row 0 (来自 DF1): A=1, B=10, C=null
+            Assert.Equal(1, colA.GetInt64Value(0));
+            Assert.Equal(10, colB.GetInt64Value(0));
+            Assert.True(colC.IsNull(0)); // DF1 没有 C 列
+
+            // Row 1 (来自 DF2): A=null, B=20, C=300
+            Assert.True(colA.IsNull(1)); // DF2 没有 A 列
+            Assert.Equal(20, colB.GetInt64Value(1));
+            Assert.Equal(300, colC.GetInt64Value(1));
+        }
     }
     // ==========================================
     // Reshaping Tests (Pivot & Unpivot)

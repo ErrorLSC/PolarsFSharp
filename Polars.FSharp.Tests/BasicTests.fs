@@ -186,3 +186,38 @@ type ``Basic Functionality Tests`` () =
         // [修复] 不要用 = null 判断 Option，要用 .IsNone
         let joinedBob = df.String("joined", 1)
         Assert.True joinedBob.IsNone
+    [<Fact>]
+    member _.``Reshaping: Concat Diagonal`` () =
+        // df1: [a, b]
+        use csv1 = new TempCsv "a,b\n1,2"
+        // df2: [a, c] (注意：没有 b，多了 c)
+        use csv2 = new TempCsv "a,c\n3,4"
+
+        let df1 = Polars.readCsv csv1.Path None
+        let df2 = Polars.readCsv csv2.Path None
+
+        // 对角拼接
+        // 结果应该包含 3 列: [a, b, c]
+        // Row 1 (来自 df1): a=1, b=2, c=null
+        // Row 2 (来自 df2): a=3, b=null, c=4
+        let res = Polars.concatDiagonal [df1; df2]
+
+        Assert.Equal(2L, res.Rows)
+        Assert.Equal(3L, res.Columns)
+        
+        // 验证列名
+        let cols = res.ColumnNames
+        Assert.Contains("a", cols)
+        Assert.Contains("b", cols)
+        Assert.Contains("c", cols)
+
+        // 验证数据
+        // 第一行 (df1)
+        Assert.Equal(1L, res.Int("a", 0).Value)
+        Assert.Equal(2L, res.Int("b", 0).Value)
+        Assert.True(res.Int("c", 0).IsNone) // c 应该是 null
+
+        // 第二行 (df2)
+        Assert.Equal(3L, res.Int("a", 1).Value)
+        Assert.True(res.Int("b", 1).IsNone) // b 应该是 null
+        Assert.Equal(4L, res.Int("c", 1).Value)

@@ -157,10 +157,19 @@ public static partial class PolarsWrapper
             })
         );
     }
-    public static DataFrameHandle Concat(DataFrameHandle[] dfs)
+    public static DataFrameHandle Concat(DataFrameHandle[] handles, PlConcatType how)
     {
-        var ptrs = HandlesToPtrs(dfs); // 转移所有权
-        var h = NativeBindings.pl_concat_vertical(ptrs, (UIntPtr)ptrs.Length);
+        var ptrs = HandlesToPtrs(handles);
+        
+        // 这里的 int 转换对应 Rust 的 how
+        var h = NativeBindings.pl_concat(ptrs, (UIntPtr)ptrs.Length, how);
+
+        // Rust 接管并消耗了所有 DF
+        foreach (var handle in handles)
+        {
+            handle.TransferOwnership();
+        }
+
         return ErrorHelper.Check(h);
     }
 }

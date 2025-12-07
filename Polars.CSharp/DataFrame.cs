@@ -201,18 +201,17 @@ public class DataFrame : IDisposable
     }
     
     /// <summary>
-    /// Concatenate multiple DataFrames vertically.
+    /// Concatenate multiple DataFrames
     /// </summary>
     /// <param name="dfs"></param>
+    /// <param name="how"></param>
     /// <returns></returns>
-    public static DataFrame Concat(IEnumerable<DataFrame> dfs)
+    public static DataFrame Concat(IEnumerable<DataFrame> dfs, ConcatType how = ConcatType.Vertical)
     {
-        // Concat 比较特殊，Native Binding 也是 TransferOwnership
-        // 如果我们希望 C# 层的原 df 还能用，这里必须 clone
         var handles = dfs.Select(d => PolarsWrapper.CloneDataFrame(d.Handle)).ToArray();
         
         //
-        return new DataFrame(PolarsWrapper.Concat(handles));
+        return new DataFrame(PolarsWrapper.Concat(handles, how.ToNative()));
     }
 
     // ==========================================

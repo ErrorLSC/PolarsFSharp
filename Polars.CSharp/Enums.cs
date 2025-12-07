@@ -82,6 +82,63 @@ public enum PivotAgg
     Last
 }
 
+// public enum TimeUnit
+// {
+//     /// <summary>
+//     /// Nanoseconds
+//     /// </summary>
+//     Nanoseconds,
+//     /// <summary>
+//     /// Microseconds
+//     /// </summary>
+//     Microseconds,
+//     /// <summary>
+//     /// Milliseconds
+//     /// </summary>
+//     Milliseconds,
+//     /// <summary>
+//     /// Seconds
+//     /// </summary>
+//     Second,
+//     /// <summary>
+//     /// Minutes
+//     /// </summary>
+//     Minute,
+//     /// <summary>
+//     /// Hours
+//     /// </summary>
+//     Hour,
+//     /// <summary>
+//     /// Days
+//     /// </summary>
+//     Day,
+//     /// <summary>
+//     /// Months
+//     /// </summary>
+//     Month,
+//     /// <summary>
+//     /// Years
+//     /// </summary>
+//     Year
+// }
+/// <summary>
+/// Concat Type Enum
+/// </summary>
+public enum ConcatType
+{
+    /// <summary>
+    /// Vertical Concatenation
+    /// </summary>
+    Vertical,
+    /// <summary>
+    /// Horizontal Concatenation
+    /// </summary>
+    Horizontal,
+    /// <summary>
+    /// Diagonal Concatenation
+    /// </summary>
+    Diagonal
+}
 internal static class EnumExtensions
 {
     //
@@ -109,5 +166,27 @@ internal static class EnumExtensions
         PivotAgg.Len => PlPivotAgg.Len,
         PivotAgg.Last => PlPivotAgg.Last,
         _ => PlPivotAgg.First
+    };
+    //
+    // public static PlTimeUnit ToNative(this TimeUnit unit) => unit switch
+    // {
+    //     TimeUnit.Nanoseconds => PlTimeUnit.Nanoseconds,
+    //     TimeUnit.Microseconds => PlTimeUnit.Microseconds,
+    //     TimeUnit.Milliseconds => PlTimeUnit.Milliseconds,
+    //     TimeUnit.Second => PlTimeUnit.Second,
+    //     TimeUnit.Minute => PlTimeUnit.Minute,
+    //     TimeUnit.Hour => PlTimeUnit.Hour,
+    //     TimeUnit.Day => PlTimeUnit.Day,
+    //     TimeUnit.Month => PlTimeUnit.Month,
+    //     TimeUnit.Year => PlTimeUnit.Year,
+    //     _ => PlTimeUnit.Nanoseconds
+    // };
+    //
+    public static PlConcatType ToNative(this ConcatType type) => type switch
+    {
+        ConcatType.Vertical => PlConcatType.Vertical,
+        ConcatType.Horizontal => PlConcatType.Horizontal,
+        ConcatType.Diagonal => PlConcatType.Diagonal,
+        _ => PlConcatType.Vertical
     };
 }

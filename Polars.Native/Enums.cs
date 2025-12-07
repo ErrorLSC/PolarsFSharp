@@ -60,3 +60,12 @@ public enum PlTimeUnit
     Month =7,
     Year =8
 }
+/// <summary>
+/// Concat Type Enum
+/// </summary>
+public enum PlConcatType
+{
+    Vertical = 0,
+    Horizontal = 1,
+    Diagonal = 2
+}

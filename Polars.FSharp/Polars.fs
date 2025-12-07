@@ -140,7 +140,18 @@ module Polars =
     /// <summary> Concatenate multiple DataFrames vertically. </summary>
     let concat (dfs: DataFrame list) : DataFrame =
         let handles = dfs |> List.map (fun df -> df.CloneHandle()) |> List.toArray
-        new DataFrame(PolarsWrapper.Concat handles)
+        new DataFrame(PolarsWrapper.Concat (handles,PlConcatType.Vertical))
+    /// <summary> Concatenate multiple DataFrames horizontally (hstack). </summary>
+    let concatHorizontal (dfs: DataFrame list) : DataFrame =
+        let handles = dfs |> List.map (fun df -> df.CloneHandle()) |> List.toArray
+        new DataFrame(PolarsWrapper.Concat(handles, PlConcatType.Horizontal))
+    /// <summary> 
+    /// Concatenate multiple DataFrames diagonally. 
+    /// Columns are aligned by name; missing columns are filled with nulls.
+    /// </summary>
+    let concatDiagonal (dfs: DataFrame list) : DataFrame =
+        let handles = dfs |> List.map (fun df -> df.CloneHandle()) |> List.toArray
+        new DataFrame(PolarsWrapper.Concat(handles, PlConcatType.Diagonal))
     /// <summary> Get the first n rows of the DataFrame. </summary>
     let head (n: int) (df: DataFrame) : DataFrame =
         let h = PolarsWrapper.Head(df.Handle, uint n)

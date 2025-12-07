@@ -1,8 +1,10 @@
 use polars::prelude::*;
+use polars_core::utils::concat_df;
 use std::{ffi::CString, os::raw::c_char};
 use crate::types::*;
 use polars::lazy::frame::pivot::pivot as pivot_impl; 
 use polars::lazy::dsl::UnpivotArgsDSL;
+use polars::functions::{concat_df_horizontal,concat_df_diagonal};
 // ==========================================
 // 0. Memory Safety
 // ==========================================
@@ -498,27 +500,41 @@ pub extern "C" fn pl_unpivot(
 // Concat
 // ==========================================
 #[unsafe(no_mangle)]
-pub extern "C" fn pl_concat_vertical(
+pub extern "C" fn pl_concat(
     dfs_ptr: *const *mut DataFrameContext,
-    len: usize
+    len: usize,
+    how: i32 // 0=Vertical, 1=Horizontal, 2=Diagonal
 ) -> *mut DataFrameContext {
     ffi_try!({
-        let slice = unsafe { std::slice::from_raw_parts(dfs_ptr, len) };
         if len == 0 {
             return Ok(Box::into_raw(Box::new(DataFrameContext { df: DataFrame::default() })));
         }
 
-        // 取出第一个作为 base
-        let base_ctx = unsafe { Box::from_raw(slice[0]) };
-        let mut base_df = base_ctx.df;
+        let slice = unsafe { std::slice::from_raw_parts(dfs_ptr, len) };
 
-        // 依次 vstack 剩下的
-        for &p in &slice[1..] {
-            let other_ctx = unsafe { Box::from_raw(p) };
-            // vstack 默认是做了垂直拼接
-            base_df.vstack_mut(&other_ctx.df)?;
+        // 1. 将所有指针解包为 DataFrame 的 Vector
+        // 注意：这里我们接管了所有输入 DataFrame 的所有权
+        let mut dfs: Vec<DataFrame> = Vec::with_capacity(len);
+        for &p in slice {
+            let ctx = unsafe { Box::from_raw(p) };
+            dfs.push(ctx.df);
         }
 
-        Ok(Box::into_raw(Box::new(DataFrameContext { df: base_df })))
+        // 2. 根据策略调用 Polars 内置的高性能拼接函数
+        // 这些函数接受 &[DataFrame] 并返回一个新的 DataFrame
+        let out_df = match how {
+            // Vertical (vstack)
+            0 => concat_df(&dfs)?,
+            
+            // Horizontal (hstack)
+            1 => concat_df_horizontal(&dfs,true)?,
+            
+            // Diagonal (对角拼接：自动对齐列，缺失补 Null)
+            2 => concat_df_diagonal(&dfs)?,
+            
+            _ => return Err(PolarsError::ComputeError("Invalid concat strategy".into())),
+        };
+
+        Ok(Box::into_raw(Box::new(DataFrameContext { df: out_df })))
     })
 }

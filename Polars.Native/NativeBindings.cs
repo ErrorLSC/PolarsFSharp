@@ -191,9 +191,10 @@ unsafe internal partial class NativeBindings
     [LibraryImport(LibName)] 
     public static partial DataFrameHandle pl_explode(DataFrameHandle df, IntPtr[] exprs, UIntPtr len);
     [LibraryImport(LibName)] 
-    public static partial DataFrameHandle pl_concat_vertical(
+    public static partial DataFrameHandle pl_concat(
         IntPtr[] dfs, 
-        UIntPtr len
+        UIntPtr len,
+        PlConcatType how
     );
     // Parquet
     [LibraryImport(LibName)] 
