@@ -1,10 +1,9 @@
-using Polars.Native; // 引用底层绑定
+using Polars.Native;
 using Apache.Arrow;
 namespace Polars.CSharp;
 
 /// <summary>
-/// 表示一个急切执行 (Eager) 的 DataFrame。
-/// 数据驻留在内存中。
+/// DataFrame represents a 2-dimensional labeled data structure similar to a table or spreadsheet.
 /// </summary>
 public class DataFrame : IDisposable
 {

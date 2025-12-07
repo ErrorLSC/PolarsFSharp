@@ -2,16 +2,16 @@ using Polars.Native;
 
 namespace Polars.CSharp;
 /// <summary>
-/// Builder for GroupByAggs
+/// Builder for LazyGroupByAggs
 /// </summary>
-public class GroupByBuilder
+public class LazyGroupByBuilder
 {
-    private readonly DataFrame _df;
+    private readonly LazyFrame _lf;
     private readonly Expr[] _by;
 
-    internal GroupByBuilder(DataFrame df, Expr[] by)
+    internal LazyGroupByBuilder(LazyFrame lf, Expr[] by)
     {
-        _df = df;
+        _lf = lf;
         _by = by;
     }
     /// <summary>
@@ -19,14 +19,13 @@ public class GroupByBuilder
     /// </summary>
     /// <param name="aggs"></param>
     /// <returns></returns>
-    public DataFrame Agg(params Expr[] aggs)
+    public LazyFrame Agg(params Expr[] aggs)
     {
-        // 同样需要 Clone Expr Handle
         var byHandles = _by.Select(b => PolarsWrapper.CloneExpr(b.Handle)).ToArray();
         var aggHandles = aggs.Select(a => PolarsWrapper.CloneExpr(a.Handle)).ToArray();
 
-        //
-        var h = PolarsWrapper.GroupByAgg(_df.Handle, byHandles, aggHandles);
-        return new DataFrame(h);
+        // LazyGroupByAgg 消耗 _lf.Handle
+        var h = PolarsWrapper.LazyGroupByAgg(_lf.Handle, byHandles, aggHandles);
+        return new LazyFrame(h);
     }
 }

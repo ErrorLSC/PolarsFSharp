@@ -101,7 +101,7 @@ public static partial class PolarsWrapper
     public static DataFrameHandle Sort(DataFrameHandle df, ExprHandle expr, bool descending)
     {
         var h = NativeBindings.pl_sort(df, expr, descending);
-        expr.TransferOwnership();// 消耗 Expr
+        expr.TransferOwnership();
         return ErrorHelper.Check(h);
     }
     public static DataFrameHandle Explode(DataFrameHandle df, ExprHandle[] exprs)
@@ -109,10 +109,9 @@ public static partial class PolarsWrapper
         var raw = HandlesToPtrs(exprs);
         return ErrorHelper.Check(NativeBindings.pl_explode(df, raw, (UIntPtr)raw.Length));
     }
-    // GroupBy 封装
+    // GroupBy
     public static DataFrameHandle GroupByAgg(DataFrameHandle df, ExprHandle[] by, ExprHandle[] agg)
     {
-        // 转换两个数组
         var rawBy = HandlesToPtrs(by);
         var rawAgg = HandlesToPtrs(agg);
         return ErrorHelper.Check(NativeBindings.pl_groupby_agg(
@@ -121,7 +120,7 @@ public static partial class PolarsWrapper
             rawAgg, (UIntPtr)rawAgg.Length
         ));
     }
-    // [新增] Pivot (Eager)
+    // Pivot (Eager)
     public static DataFrameHandle Pivot(DataFrameHandle df, string[] index, string[] columns, string[] values, PlPivotAgg aggFn)
     {
         // 三层嵌套稍微有点丑，但能复用 UseUtf8StringArray 的安全机制
@@ -141,7 +140,7 @@ public static partial class PolarsWrapper
         );
     }
 
-    // [新增] Unpivot (Eager)
+    // Unpivot (Eager)
     public static DataFrameHandle Unpivot(DataFrameHandle df, string[] index, string[] on, string? variableName, string? valueName)
     {
         return UseUtf8StringArray(index, iPtrs =>
