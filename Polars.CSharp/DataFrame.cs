@@ -185,20 +185,21 @@ public class DataFrame : IDisposable
     /// <param name="rightOn"></param>
     /// <param name="how"></param>
     /// <returns></returns>
-    public DataFrame Join(DataFrame other, Expr leftOn, Expr rightOn, JoinType how = JoinType.Inner)
+    public DataFrame Join(DataFrame other, Expr[] leftOn, Expr[] rightOn, JoinType how = JoinType.Inner)
     {
-        var lOn = new[] { PolarsWrapper.CloneExpr(leftOn.Handle) };
-        var rOn = new[] { PolarsWrapper.CloneExpr(rightOn.Handle) };
+        var lHandles = leftOn.Select(e => PolarsWrapper.CloneExpr(e.Handle)).ToArray();
+        var rHandles = rightOn.Select(e => PolarsWrapper.CloneExpr(e.Handle)).ToArray();
         
         //
-        return new DataFrame(PolarsWrapper.Join(
+    return new DataFrame(PolarsWrapper.Join(
             this.Handle, 
             other.Handle, 
-            lOn, 
-            rOn, 
+            lHandles, 
+            rHandles, 
             how.ToNative()
         ));
     }
+    
     /// <summary>
     /// Concatenate multiple DataFrames vertically.
     /// </summary>

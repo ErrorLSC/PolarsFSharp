@@ -1,6 +1,6 @@
 ﻿using Apache.Arrow;
 using Apache.Arrow.Memory;
-
+using static Polars.CSharp.Polars;
 namespace Polars.CSharp.Tests;
 
 public class DataFrameTests
@@ -30,8 +30,8 @@ David,40,80000";
             // 3. 执行操作：筛选 age > 30 并选择 name 和 salary
             // SQL 逻辑: SELECT name, salary FROM df WHERE age > 30
             using var filtered = df
-                .Filter(Polars.Col("age") > Polars.Lit(30))
-                .Select(Polars.Col("name"), Polars.Col("salary"));
+                .Filter(Col("age") > Lit(30))
+                .Select(Col("name"), Col("salary"));
 
             // 验证结果
             // 应该剩下 Charlie (35) 和 David (40)
@@ -102,9 +102,9 @@ HR,50";
 
             // GroupBy dept, Agg Sum(salary)
             using var grouped = df
-                .GroupBy(Polars.Col("dept"))
-                .Agg(Polars.Col("salary").Sum().Alias("total_salary"))
-                .Sort(Polars.Col("total_salary"), descending: true); // 排序方便断言
+                .GroupBy(Col("dept"))
+                .Agg(Col("salary").Sum().Alias("total_salary"))
+                .Sort(Col("total_salary"), descending: true); // 排序方便断言
 
             // 预期: 
             // IT: 300
@@ -126,6 +126,73 @@ HR,50";
         {
             if (File.Exists(fileName)) File.Delete(fileName);
         }
+    }
+    // ==========================================
+    // Join Tests
+    // ==========================================
+[Fact]
+    public void Test_DataFrame_Join_MultiColumn()
+    {
+        // 场景：学生在不同年份有不同的成绩
+        // Alice 在 2023 和 2024 都有成绩
+        // Bob 只有 2023 的成绩
+        var scoresContent = @"student,year,score
+Alice,2023,85
+Alice,2024,90
+Bob,2023,70";
+        using var scoresCsv = new DisposableCsv(scoresContent);
+        using var scoresDf = DataFrame.ReadCsv(scoresCsv.Path);
+
+        // 场景：班级分配表
+        // Alice: 2023是Math班, 2024是Physics班
+        // Bob:   2024是History班 (注意：Bob 2023没有班级记录)
+        var classContent = @"student,year,class
+Alice,2023,Math
+Alice,2024,Physics
+Bob,2024,History";
+        using var classCsv = new DisposableCsv(classContent);
+        using var classDf = DataFrame.ReadCsv(classCsv.Path);
+
+        // 执行多列 Join (Inner Join)
+        // 逻辑：必须 student 和 year 都相同才算匹配
+        // 预期结果：
+        // 1. Alice + 2023 -> 匹配
+        // 2. Alice + 2024 -> 匹配
+        // 3. Bob + 2023   -> 左表有Bob 2023，但右表只有 Bob 2024 -> 丢弃 (因为是 Inner Join)
+        using var joinedDf = scoresDf.Join(
+            classDf,
+            leftOn: [Col("student"), Col("year")],   // 左表双键
+            rightOn: [Col("student"), Col("year")],  // 右表双键
+            how: JoinType.Inner
+        );
+
+        // 验证高度：应该只有 2 行 (Alice 2023, Alice 2024)
+        Assert.Equal(2, joinedDf.Height); 
+        
+        // 验证宽度：student, year, score, class (year 在 Join 后通常会去重或保留一份，具体看 Polars 行为，通常保留左表的)
+        // Polars Join 后列名如果冲突会自动处理，或者保留 Key。
+        // 这里的列应该是: student, year, score, class
+        Assert.Equal(4, joinedDf.Width);
+
+        using var batch = joinedDf.ToArrow();
+        
+        // 排序以确保验证顺序 (按 year 排序)
+        // 但这里我们简单通过 Filter 验证或者假定顺序（CSV读取顺序通常保留）
+        
+        // 验证第一行 (Alice 2023)
+        Assert.Equal("Alice", batch.Column("student").GetStringValue(0));
+        Assert.Equal(2023, batch.Column("year").GetInt64Value(0));
+        Assert.Equal("Math", batch.Column("class").GetStringValue(0));
+
+        // 验证第二行 (Alice 2024)
+        Assert.Equal("Alice", batch.Column("student").GetStringValue(1));
+        Assert.Equal(2024, batch.Column("year").GetInt64Value(1));
+        Assert.Equal("Physics", batch.Column("class").GetStringValue(1));
+
+        // 验证 Bob 确实被删除了 (因为他在右表没有 2023 的记录)
+        // 我们可以简单地检查 DataFrame 里没有 Bob
+        using var bobCheck = joinedDf.Filter(Col("student") == Lit("Bob"));
+        Assert.Equal(0, bobCheck.Height);
     }
     // ==========================================
     // Display Tests (Head & Show)
