@@ -191,19 +191,19 @@ public class LazyFrame : IDisposable
     /// <summary>
     /// Concatenate multiple LazyFrames into one.
     /// </summary>
+    /// <param name="how"></param>
     /// <param name="lfs"></param>
     /// <param name="rechunk"></param>
     /// <param name="parallel"></param>
     /// <returns></returns>
-    public static LazyFrame Concat(IEnumerable<LazyFrame> lfs, bool rechunk = false, bool parallel = true)
+    public static LazyFrame Concat(
+        IEnumerable<LazyFrame> lfs, 
+        ConcatType how = ConcatType.Vertical, 
+        bool rechunk = false, 
+        bool parallel = true)
     {
-        // LazyConcat 消耗输入的 handles
-        var handles = lfs.Select(l => l.Handle).ToArray(); 
-        // 注意：这里我们选择**不Clone**，意味着 Concat 后原来的变量就不能用了。
-        // 这是 Lazy API 的惯例。如果用户想保留，应该先调用 .Clone()。
-        
-        //
-        return new LazyFrame(PolarsWrapper.LazyConcat(handles, rechunk, parallel));
+        var handles = lfs.Select(l => PolarsWrapper.LazyClone(l.Handle)).ToArray();
+        return new LazyFrame(PolarsWrapper.LazyConcat(handles, how.ToNative(), rechunk, parallel));
     }
 
     // ==========================================

@@ -276,26 +276,41 @@ type ``Complex Query Tests`` () =
         Assert.Equal(400L, wideDf.Int("Q2", 1).Value)
 
     [<Fact>]
-    member _.``Lazy Concatenation: Vertical Stack`` () =
-        // DF1: 1, 2
-        use csv1 = new TempCsv "val\n1\n2"
-        // DF2: 3, 4
-        use csv2 = new TempCsv "val\n3\n4"
+    member _.``Lazy Reshaping: Concat All Types`` () =
+        // lf1: [a]
+        // lf2: [b]
+        // lf3: [a]
+        let lf1 = Polars.scanCsv (new TempCsv "a\n1").Path None
+        let lf2 = Polars.scanCsv (new TempCsv "b\n2").Path None
+        let lf3 = Polars.scanCsv (new TempCsv "a\n3").Path None
 
-        let lf1 = Polars.scanCsv csv1.Path None
-        let lf2 = Polars.scanCsv csv2.Path None
+        // 1. Horizontal: [a, b]
+        let dfHorz = 
+            Polars.concatLazyHorizontal [lf1; lf2]
+            |> Polars.collect
+        
+        Assert.Equal(1L, dfHorz.Rows)
+        Assert.Equal(2L, dfHorz.Columns)
+        Assert.Equal(1L, dfHorz.Int("a", 0).Value)
+        Assert.Equal(2L, dfHorz.Int("b", 0).Value)
 
-        // 测试 Lazy Concat
-        let bigLf = Polars.concatLazy [lf1; lf2]
-        let bigDf = bigLf |> Polars.collect |> Polars.sort (Polars.col "val") false
+        // 2. Vertical: [a] (rows=2)        
+        let dfVert = 
+            Polars.concatLazy [lf1; lf3]
+            |> Polars.collect
+        
+        Assert.Equal(2L, dfVert.Rows)
+        Assert.Equal(1L, dfVert.Columns)
 
-        Assert.Equal(4L, bigDf.Rows)
-        Assert.Equal(1L, bigDf.Int("val", 0).Value)
-        Assert.Equal(4L, bigDf.Int("val", 3).Value)
-
-        // 验证 lf1 依然可用 (因为 concatLazy 内部做了 CloneHandle)
-        let lf1Count = lf1 |> Polars.collect |> fun d -> d.Rows
-        Assert.Equal(2L, lf1Count)
+        // 3. Diagonal: [a, b] (rows=2)
+        // lf1 (a=1, b=null)
+        // lf2 (a=null, b=2)
+        let dfDiag =
+            Polars.concatLazyDiagonal [lf1; lf2]
+            |> Polars.collect
+        
+        Assert.Equal(2L, dfDiag.Rows)
+        Assert.Equal(2L, dfDiag.Columns)
 
     [<Fact>]
     member _.``Concatenation: Eager Stack (Safety Check)`` () =

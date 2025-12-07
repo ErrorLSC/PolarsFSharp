@@ -275,38 +275,53 @@ pub extern "C" fn pl_lazy_unpivot(
 // ==========================================
 #[unsafe(no_mangle)]
 pub extern "C" fn pl_lazy_concat(
-    lfs_ptr: *const *mut LazyFrameContext, // 指针数组
+    lfs_ptr: *const *mut LazyFrameContext, 
     len: usize,
-    rechunk: bool,
-    parallel: bool
+    how: i32,        // 0=Vert, 1=Horz, 2=Diag
+    rechunk: bool,   // 统一传给 UnionArgs
+    parallel: bool   // 统一传给 UnionArgs
 ) -> *mut LazyFrameContext {
     ffi_try!({
-        // 1. 转换指针数组为 Vec<LazyFrame>
-        // 注意：这里我们需要消费掉所有的输入 LazyFrame (拿走所有权)
+        // 1. 消费所有 LazyFrame
         let mut lfs = Vec::with_capacity(len);
         let slice = unsafe { std::slice::from_raw_parts(lfs_ptr, len) };
         
         for &p in slice {
-            // Box::from_raw 会拿回所有权，循环结束后如果不 move 就会 drop
-            // 所以我们需要把 inner 拿出来放入 Vec
             let lf_ctx = unsafe { Box::from_raw(p) };
             lfs.push(lf_ctx.inner);
         }
 
-        // 2. 构建参数
+        if lfs.is_empty() {
+             return Err(PolarsError::ComputeError("Cannot concat empty list of LazyFrames".into()));
+        }
+
+        // 2. 统一构建 UnionArgs
+        // 无论哪种拼接，都把配置传进去，由 Polars 内部决定用不用
         let args = UnionArgs {
             rechunk,
             parallel,
             ..Default::default()
         };
 
-        // 3. 调用 concat
-        // polars::prelude::concat 接受 Vec<LazyFrame>
-        let new_lf = concat(lfs, args)?;
+        // 3. 根据策略调用
+        let new_lf = match how {
+            // Vertical
+            0 => concat(lfs, args)?,
+            
+            // Horizontal
+            // 既然源码签名是 fn(inputs, args)，我们就直接传 args
+            1 => concat_lf_horizontal(lfs, args)?,
+
+            // Diagonal
+            2 => concat_lf_diagonal(lfs, args)?,
+
+            _ => return Err(PolarsError::ComputeError("Invalid lazy concat strategy".into())),
+        };
         
         Ok(Box::into_raw(Box::new(LazyFrameContext { inner: new_lf })))
     })
 }
+
 // ==========================================
 // Join & Join As of
 // ==========================================

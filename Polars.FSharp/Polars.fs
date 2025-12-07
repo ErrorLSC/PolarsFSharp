@@ -308,11 +308,22 @@ module Polars =
         new LazyFrame(h)
     /// <summary> Concatenate multiple LazyFrames vertically. </summary>
     let concatLazy (lfs: LazyFrame list) : LazyFrame =
-        // 同样，LazyFrame 支持 CloneHandle (我们之前加过)
-        // 这里我们可以选择自动 Clone，保持 Functional 的不可变感觉
         let handles = lfs |> List.map (fun lf -> lf.CloneHandle()) |> List.toArray
-        
-        new LazyFrame(PolarsWrapper.LazyConcat handles)
+        // 默认 rechunk=false, parallel=true (Lazy 的常见默认值)
+        new LazyFrame(PolarsWrapper.LazyConcat(handles, PlConcatType.Vertical, false, true))
+    /// <summary> 
+    /// Lazily concatenate multiple LazyFrames horizontally.
+    /// Note: Duplicate column names will cause an error during collection.
+    /// </summary>
+    let concatLazyHorizontal (lfs: LazyFrame list) : LazyFrame =
+        let handles = lfs |> List.map (fun lf -> lf.CloneHandle()) |> List.toArray
+        new LazyFrame(PolarsWrapper.LazyConcat(handles, PlConcatType.Horizontal, false, false))
+    /// <summary> 
+    /// Lazily concatenate multiple LazyFrames diagonally. 
+    /// </summary>
+    let concatLazyDiagonal (lfs: LazyFrame list) : LazyFrame =
+        let handles = lfs |> List.map (fun lf -> lf.CloneHandle()) |> List.toArray
+        new LazyFrame(PolarsWrapper.LazyConcat(handles, PlConcatType.Diagonal, false, true))
     /// <summary> Collect LazyFrame into DataFrame (Streaming execution). </summary>
     let collectStreaming (lf: LazyFrame) : DataFrame =
         let lfClone = lf.CloneHandle()

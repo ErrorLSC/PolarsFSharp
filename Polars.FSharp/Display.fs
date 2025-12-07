@@ -57,7 +57,7 @@ module Display =
             sb.Append "<tr>" |> ignore
             // sb.AppendFormat("<td style='color:#999'>{0}</td>", i) |> ignore // 行号
             for field in fields do
-                let col = batch.Column(field.Name)
+                let col = batch.Column field.Name
                 // 调用格式化
                 sb.AppendFormat("<td>{0}</td>", formatValueHtml col i) |> ignore
             sb.Append "</tr>" |> ignore

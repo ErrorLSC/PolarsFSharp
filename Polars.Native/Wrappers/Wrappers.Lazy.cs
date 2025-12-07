@@ -111,10 +111,14 @@ public static partial class PolarsWrapper
             })
         );
     }
-    public static LazyFrameHandle LazyConcat(LazyFrameHandle[] lfs, bool rechunk = false, bool parallel = true)
+    public static LazyFrameHandle LazyConcat(LazyFrameHandle[] handles,PlConcatType how, bool rechunk = false, bool parallel = true)
     {
-        var ptrs = HandlesToPtrs(lfs); // 转移所有权
-        var h = NativeBindings.pl_lazy_concat(ptrs, (UIntPtr)ptrs.Length, rechunk, parallel);
+        var ptrs = HandlesToPtrs(handles); // 转移所有权
+        var h = NativeBindings.pl_lazy_concat(ptrs, (UIntPtr)ptrs.Length,(int)how, rechunk, parallel);
+        foreach (var handle in handles)
+        {
+            handle.TransferOwnership();
+        }
         return ErrorHelper.Check(h);
     }
     public static LazyFrameHandle Join(

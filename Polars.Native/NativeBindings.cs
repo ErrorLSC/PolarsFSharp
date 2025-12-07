@@ -281,6 +281,7 @@ unsafe internal partial class NativeBindings
     public static partial LazyFrameHandle pl_lazy_concat(
         IntPtr[] lfs, 
         UIntPtr len,
+        int how,
         [MarshalAs(UnmanagedType.U1)] bool rechunk,
         [MarshalAs(UnmanagedType.U1)] bool parallel
     );
