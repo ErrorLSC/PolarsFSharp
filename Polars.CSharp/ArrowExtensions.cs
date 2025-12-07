@@ -194,4 +194,123 @@ public static class ArrowExtensions
             $"{field.Name}: {arr.Fields[i].FormatValue(index)}");
         return $"{{{string.Join(", ", fields)}}}";
     }
+
+    // ==========================================
+    // 3. Typed Accessors (Casting to C# Types)
+    // ==========================================
+
+    /// <summary>
+    /// Fetch DateTime object. Automatically handles Arrow Time Unit.
+    /// </summary>
+    public static DateTime? GetDateTime(this IArrowArray array, int index)
+    {
+        if (array.IsNull(index)) return null;
+
+        return array switch
+        {
+            // Timestamp
+            TimestampArray tsArr => ConvertTimestamp(tsArr, index),
+            
+            // Date32 (Days since epoch)
+            Date32Array d32 => new DateTime(1970, 1, 1).AddDays(d32.GetValue(index)!.Value),
+            
+            // Date64 (Milliseconds since epoch)
+            Date64Array d64 => new DateTime(1970, 1, 1).AddMilliseconds(d64.GetValue(index)!.Value),
+
+            _ => null
+        };
+    }
+
+    /// <summary>
+    /// Fetch TimeSpan object. Automatically handles Arrow Time Unit.
+    /// </summary>
+    public static TimeSpan? GetTimeSpan(this IArrowArray array, int index)
+    {
+        if (array.IsNull(index)) return null;
+
+        return array switch
+        {
+            // Time32 (s or ms)
+            Time32Array t32 => ConvertTime32(t32, index),
+            
+            // Time64 (us or ns)
+            Time64Array t64 => ConvertTime64(t64, index),
+            
+            // Duration
+            DurationArray dur => ConvertDuration(dur, index),
+
+            _ => null
+        };
+    }
+
+    // ==========================================
+    // Internal Conversion Logic
+    // ==========================================
+
+    private static DateTime ConvertTimestamp(TimestampArray arr, int index)
+    {
+        long v = arr.GetValue(index).GetValueOrDefault();
+        var unit = (arr.Data.DataType as TimestampType)?.Unit;
+        
+        // C# DateTime 使用 Ticks (100ns)
+        // Unix Epoch 是 1970-01-01
+        long ticks = unit switch
+        {
+            TimeUnit.Nanosecond => v / 100L,        // ns -> 100ns
+            TimeUnit.Microsecond => v * 10L,        // us -> 100ns
+            TimeUnit.Millisecond => v * 10000L,     // ms -> 100ns
+            TimeUnit.Second => v * 10000000L,       // s  -> 100ns
+            _ => v // Should not happen
+        };
+
+        try 
+        {
+            return DateTime.UnixEpoch.AddTicks(ticks);
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            // 如果超出 C# DateTime 范围，返回 Min/Max 或抛出
+            return v > 0 ? DateTime.MaxValue : DateTime.MinValue;
+        }
+    }
+
+    private static TimeSpan ConvertTime32(Time32Array arr, int index)
+    {
+        int v = arr.GetValue(index).GetValueOrDefault();
+        var unit = (arr.Data.DataType as Time32Type)?.Unit;
+        return unit switch
+        {
+            TimeUnit.Millisecond => TimeSpan.FromMilliseconds(v),
+            _ => TimeSpan.FromSeconds(v)
+        };
+    }
+
+    private static TimeSpan ConvertTime64(Time64Array arr, int index)
+    {
+        long v = arr.GetValue(index).GetValueOrDefault();
+        var unit = (arr.Data.DataType as Time64Type)?.Unit;
+        
+        long ticks = unit switch
+        {
+            TimeUnit.Nanosecond => v / 100L,
+            _ => v * 10L // Microsecond
+        };
+        return TimeSpan.FromTicks(ticks);
+    }
+
+    private static TimeSpan ConvertDuration(DurationArray arr, int index)
+    {
+        long v = arr.GetValue(index).GetValueOrDefault();
+        var unit = (arr.Data.DataType as DurationType)?.Unit;
+        
+        long ticks = unit switch
+        {
+            TimeUnit.Nanosecond => v / 100L,
+            TimeUnit.Microsecond => v * 10L,
+            TimeUnit.Millisecond => v * 10000L,
+            TimeUnit.Second => v * 10000000L,
+            _ => v
+        };
+        return TimeSpan.FromTicks(ticks);
+    }
 }
