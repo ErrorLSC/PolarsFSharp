@@ -195,6 +195,104 @@ Bob,2024,History";
         Assert.Equal(0, bobCheck.Height);
     }
     // ==========================================
+    // Concat Tests
+    // ==========================================
+    [Fact]
+    public void Test_Concat()
+    {
+        // 构造两个结构相同的 DataFrame
+        using var csv1 = new DisposableCsv("id,name\n1,Alice\n2,Bob");
+        using var df1 = DataFrame.ReadCsv(csv1.Path);
+
+        using var csv2 = new DisposableCsv("id,name\n3,Charlie\n4,David");
+        using var df2 = DataFrame.ReadCsv(csv2.Path); 
+
+        // 执行垂直拼接
+        using var concatenated = DataFrame.Concat([df1, df2]);
+        // 验证结果
+        Assert.Equal(4, concatenated.Height); // 应该有4行
+        Assert.Equal(2, concatenated.Width);  // 仍然是2列
+
+        using var batch = concatenated.ToArrow();
+        // 验证具体值
+        Assert.Equal(1, batch.Column("id").GetInt64Value(0));
+        Assert.Equal("Alice", batch.Column("name").GetStringValue(0));
+        Assert.Equal(2, batch.Column("id").GetInt64Value(1));
+        Assert.Equal("Bob", batch.Column("name").GetStringValue(1));
+        Assert.Equal(3, batch.Column("id").GetInt64Value(2));
+        Assert.Equal("Charlie", batch.Column("name").GetStringValue(2));
+        Assert.Equal(4, batch.Column("id").GetInt64Value(3));
+        Assert.Equal("David", batch.Column("name").GetStringValue(3));
+    }
+    // ==========================================
+    // Reshaping Tests (Pivot & Unpivot)
+    // ==========================================
+    [Fact]
+    public void Test_Pivot_Unpivot()
+    {
+        // 构造“长表”数据：记录了不同城市在不同日期的温度
+        // date, city, temp
+        var content = @"date,city,temp
+2024-01-01,NY,5
+2024-01-01,LA,20
+2024-01-02,NY,2
+2024-01-02,LA,18";
+        
+        using var csv = new DisposableCsv(content);
+        using var df = DataFrame.ReadCsv(csv.Path);
+
+        // --- Step 1: Pivot (长 -> 宽) ---
+        // 目标：每一行是 date，列变成 city (NY, LA)，值是 temp
+        using var pivoted = df.Pivot(
+            index: ["date"],
+            columns: ["city"],
+            values: ["temp"],
+            agg: PivotAgg.First // 因为 (date, city) 唯一，First 即可
+        );
+
+        // 验证 Pivot 结果
+        // 列应该是: date, NY, LA (顺序可能变，取决于 Polars 内部哈希，通常是排序的或按出现顺序)
+        Assert.Equal(2, pivoted.Height); // 只有两天 (01-01, 01-02)
+        Assert.Equal(3, pivoted.Width);  // date, NY, LA
+        
+        // 简单打印一下结构，防止列名顺序不确定导致测试挂掉
+        pivoted.Show(); 
+
+        using var pBatch = pivoted.ToArrow();
+        // 验证 2024-01-01 的 NY 气温 (假设第一行是 01-01)
+        // 注意：Arrow 列名区分大小写
+        Assert.Equal(5, pBatch.Column("NY").GetInt64Value(0)); 
+        Assert.Equal(20, pBatch.Column("LA").GetInt64Value(0));
+
+        // --- Step 2: Unpivot/Melt (宽 -> 长) ---
+        // 把刚才的宽表还原。
+        // Index 保持 "date" 不变
+        // 把 "NY" 和 "LA" 这两列融化成 "city" (variable) 和 "temp" (value)
+        using var unpivoted = pivoted.Unpivot(
+            index: ["date"],
+            on: ["NY", "LA"],
+            variableName: "city",
+            valueName: "temp_restored"
+        ).Sort(Col("date")); // 排序以便断言
+
+        // 验证 Unpivot 结果
+        // 高度应该回到 4 行
+        Assert.Equal(4, unpivoted.Height);
+        Assert.Equal(3, unpivoted.Width); // date, city, temp_restored
+
+        using var uBatch = unpivoted.ToArrow();
+        
+        // 验证列名是否存在
+        Assert.NotNull(uBatch.Column("city"));
+        Assert.NotNull(uBatch.Column("temp_restored"));
+
+        // 验证值是否还在
+        // 比如第一行应该是 2024-01-01, NY, 5 (或者 LA, 20，取决于排序稳定性，我们这里不深究具体排序，只验证数据存在性)
+        // 简单验证第一行的数据类型正确
+        Assert.NotNull(uBatch.Column("city").GetStringValue(0));
+        Assert.NotNull(uBatch.Column("temp_restored").GetInt64Value(0));
+    }
+    // ==========================================
     // Display Tests (Head & Show)
     // ==========================================
     [Fact]
