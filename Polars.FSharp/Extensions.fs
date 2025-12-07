@@ -5,7 +5,9 @@ open FSharp.Reflection
 open Apache.Arrow
 open Apache.Arrow.Types
 open Polars.Native
-
+/// <summary>
+/// Extensions for DataFrame serialization/deserialization with F# Records.
+/// </summary>
 [<AutoOpen>]
 module Serialization =
 
@@ -276,4 +278,4 @@ module Serialization =
             use batch = new RecordBatch(schema, arrays, rowCount)
             
             // 零拷贝传入 Polars (PolarsWrapper.FromArrow 内部会处理导出)
-            new DataFrame(PolarsWrapper.FromArrow(batch))
+            new DataFrame(PolarsWrapper.FromArrow batch)

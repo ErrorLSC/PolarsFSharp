@@ -4,7 +4,9 @@ open System
 open System.Text
 open Microsoft.DotNet.Interactive.Formatting
 open Polars.Native
-
+/// <summary>
+/// Display utilities for DataFrame and LazyFrame in interactive environments.
+/// </summary>
 [<AutoOpen>]
 module Display =
     

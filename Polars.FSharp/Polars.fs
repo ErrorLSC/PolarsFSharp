@@ -74,20 +74,29 @@ module Polars =
     let fromArrow (batch: Apache.Arrow.RecordBatch) : DataFrame =
         new DataFrame(PolarsWrapper.FromArrow(batch))
     // --- Expr Helpers ---
-
-    let cast (dtype: DataType) (e: Expr) = e.Cast(dtype)
+    /// <summary> Cast an expression to a different data type. </summary>
+    let cast (dtype: DataType) (e: Expr) = e.Cast dtype
+    /// Common DataTypes
+    let boolean = DataType.Boolean
     let int32 = DataType.Int32
     let float64 = DataType.Float64
     let string = DataType.String
+    /// <summary> Count the number of elements in an expression. </summary>
     let count () = new Expr(PolarsWrapper.Len())
+    /// Alias for count
     let len = count
+    /// <summary> Alias an expression with a new name. </summary>
     let alias (name: string) (expr: Expr) = expr.Alias name
+    /// <summary> Collect LazyFrame into DataFrame (Eager execution). </summary>
     let collect (lf: LazyFrame) : DataFrame = 
         let lfClone = lf.CloneHandle()
         let dfHandle = PolarsWrapper.LazyCollect(lfClone)
         new DataFrame(dfHandle)
+    /// <summary> Convert Selector to Expr. </summary>
     let asExpr (s: Selector) = s.ToExpr()
+    /// <summary> Exclude columns from Selector. </summary>
     let exclude (names: string list) (s: Selector) = s.Exclude names
+    /// <summary> Create a Struct expression from a list of expressions. </summary>
     let asStruct (exprs: Expr list) =
         let handles = exprs |> List.map (fun e -> e.CloneHandle()) |> List.toArray
         new Expr(PolarsWrapper.AsStruct(handles))
@@ -97,17 +106,18 @@ module Polars =
         let exprHandle = expr.CloneHandle()
         let h = PolarsWrapper.WithColumns(df.Handle, [| exprHandle |])
         new DataFrame(h)
+    /// <summary> Add or replace multiple columns. </summary>
     let withColumns (exprs: Expr list) (df: DataFrame) : DataFrame =
-        let handles = exprs |> List.map (fun e -> e.Handle) |> List.toArray
+        let handles = exprs |> List.map (fun e -> e.CloneHandle()) |> List.toArray
         let h = PolarsWrapper.WithColumns(df.Handle, handles)
         new DataFrame(h)
     /// <summary> Filter rows based on a boolean expression. </summary>
     let filter (expr: Expr) (df: DataFrame) : DataFrame =
-        let h = PolarsWrapper.Filter(df.Handle, expr.Handle)
+        let h = PolarsWrapper.Filter(df.Handle, expr.CloneHandle())
         new DataFrame(h)
     /// <summary> Select columns from DataFrame. </summary>
     let select (exprs: Expr list) (df: DataFrame) : DataFrame =
-        let handles = exprs |> List.map (fun e -> e.Handle) |> List.toArray
+        let handles = exprs |> List.map (fun e -> e.CloneHandle()) |> List.toArray
         let h = PolarsWrapper.Select(df.Handle, handles)
         new DataFrame(h)
     /// <summary> Sort (Order By) the DataFrame. </summary>
@@ -117,19 +127,18 @@ module Polars =
     let orderBy (expr: Expr) (desc: bool) (df: DataFrame) = sort expr desc df
     /// <summary> Group by keys and apply aggregations. </summary>
     let groupBy (keys: Expr list) (aggs: Expr list) (df: DataFrame) : DataFrame =
-        let kHandles = keys |> List.map (fun e -> e.Handle) |> List.toArray
-        let aHandles = aggs |> List.map (fun e -> e.Handle) |> List.toArray
+        let kHandles = keys |> List.map (fun e -> e.CloneHandle()) |> List.toArray
+        let aHandles = aggs |> List.map (fun e -> e.CloneHandle()) |> List.toArray
         let h = PolarsWrapper.GroupByAgg(df.Handle, kHandles, aHandles)
         new DataFrame(h)
-    /// <summary> Join two DataFrames into one. </summary>
+    /// <summary> Perform a join between two DataFrames. </summary>
     let join (other: DataFrame) (leftOn: Expr list) (rightOn: Expr list) (how: JoinType) (left: DataFrame) : DataFrame =
-        let lHandles = leftOn |> List.map (fun e -> e.Handle) |> List.toArray
-        let rHandles = rightOn |> List.map (fun e -> e.Handle) |> List.toArray
+        let lHandles = leftOn |> List.map (fun e -> e.CloneHandle()) |> List.toArray
+        let rHandles = rightOn |> List.map (fun e -> e.CloneHandle()) |> List.toArray
         let h = PolarsWrapper.Join(left.Handle, other.Handle, lHandles, rHandles, how.ToNative())
         new DataFrame(h)
     /// <summary> Concatenate multiple DataFrames vertically. </summary>
     let concat (dfs: DataFrame list) : DataFrame =
-
         let handles = dfs |> List.map (fun df -> df.CloneHandle()) |> List.toArray
         new DataFrame(PolarsWrapper.Concat handles)
     /// <summary> Get the first n rows of the DataFrame. </summary>
@@ -148,7 +157,7 @@ module Polars =
 
     // --- Reshaping (Eager) ---
 
-    //// <summary> Pivot the DataFrame from long to wide format. </summary>
+    /// <summary> Pivot the DataFrame from long to wide format. </summary>
     let pivot (index: string list) (columns: string list) (values: string list) (aggFn: PivotAgg) (df: DataFrame) : DataFrame =
         let iArr = List.toArray index
         let cArr = List.toArray columns
@@ -162,26 +171,30 @@ module Polars =
         let varN = Option.toObj variableName 
         let valN = Option.toObj valueName 
         new DataFrame(PolarsWrapper.Unpivot(df.Handle, iArr, oArr, varN, valN))
+    /// Alias for unpivot
     let melt = unpivot    
-    // Arithmetic Helpers
+    /// Aggregation Helpers
     let sum (e: Expr) = e.Sum()
     let mean (e: Expr) = e.Mean()
     let max (e: Expr) = e.Max()
     let min (e: Expr) = e.Min()
     // Fill Helpers
-    let fillNull (fillValue: Expr) (e: Expr) = e.FillNull(fillValue)
+    let fillNull (fillValue: Expr) (e: Expr) = e.FillNull fillValue
     let isNull (e: Expr) = e.IsNull()
     let isNotNull (e: Expr) = e.IsNotNull()
     // Math Helpers
     let abs (e: Expr) = e.Abs()
-    let pow (exponent: Expr) (baseExpr: Expr) = baseExpr.Pow(exponent)
+    let pow (exponent: Expr) (baseExpr: Expr) = baseExpr.Pow exponent
     let sqrt (e: Expr) = e.Sqrt()
     let exp (e: Expr) = e.Exp()
 
     // --- Lazy API ---
 
+    /// <summary> Explain the LazyFrame execution plan. </summary>
     let explain (lf: LazyFrame) = lf.Explain true
+    /// <summary> Explain the unoptimized LazyFrame execution plan. </summary>
     let explainUnoptimized (lf: LazyFrame) = lf.Explain false
+    /// <summary> Get the schema of the LazyFrame. </summary>
     let schema (lf: LazyFrame) = lf.Schema
     /// <summary> Filter rows based on a boolean expression. </summary>
     let filterLazy (expr: Expr) (lf: LazyFrame) : LazyFrame =
@@ -205,23 +218,22 @@ module Polars =
         let exprClone = expr.CloneHandle()
         let h = PolarsWrapper.LazySort(lfClone, exprClone, desc)
         new LazyFrame(h)
-
+    /// <summary> Alias for sortLazy </summary>
     let orderByLazy (expr: Expr) (desc: bool) (lf: LazyFrame) = sortLazy expr desc lf
 
-    // Limit
+    /// <summary> Limit the number of rows in the LazyFrame. </summary>
     let limit (n: uint) (lf: LazyFrame) : LazyFrame =
         let lfClone = lf.CloneHandle()
         let h = PolarsWrapper.LazyLimit(lfClone, n)
         new LazyFrame(h)
-
-    // WithColumn
+    /// <summary> Add or replace columns in the LazyFrame. </summary>
     let withColumnLazy (expr: Expr) (lf: LazyFrame) : LazyFrame =
         let lfClone = lf.CloneHandle()
         let exprClone = expr.CloneHandle()
         let handles = [| exprClone |] // 使用克隆的 handle
         let h = PolarsWrapper.LazyWithColumns(lfClone, handles)
         new LazyFrame(h)
-
+    /// <summary> Add or replace multiple columns in the LazyFrame. </summary>
     let withColumnsLazy (exprs: Expr list) (lf: LazyFrame) : LazyFrame =
         let lfClone = lf.CloneHandle()
         let handles = exprs |> List.map (fun e -> e.CloneHandle()) |> List.toArray
@@ -243,8 +255,9 @@ module Polars =
         let varN = Option.toObj variableName
         let valN = Option.toObj valueName 
         new LazyFrame(PolarsWrapper.LazyUnpivot(lfClone, iArr, oArr, varN, valN))
-
+    /// Alias for unpivotLazy
     let meltLazy = unpivotLazy
+    /// <summary> Perform a join between two LazyFrames. </summary>
     let joinLazy (other: LazyFrame) (leftOn: Expr list) (rightOn: Expr list) (how: JoinType) (lf: LazyFrame) : LazyFrame =
         let lClone = lf.CloneHandle()
         let rClone = other.CloneHandle()
@@ -282,21 +295,22 @@ module Polars =
             strat, tol
         )
         new LazyFrame(h)
-
+    /// <summary> Concatenate multiple LazyFrames vertically. </summary>
     let concatLazy (lfs: LazyFrame list) : LazyFrame =
         // 同样，LazyFrame 支持 CloneHandle (我们之前加过)
         // 这里我们可以选择自动 Clone，保持 Functional 的不可变感觉
         let handles = lfs |> List.map (fun lf -> lf.CloneHandle()) |> List.toArray
         
-        new LazyFrame(PolarsWrapper.LazyConcat(handles))
-    // Streaming Collect
+        new LazyFrame(PolarsWrapper.LazyConcat handles)
+    /// <summary> Collect LazyFrame into DataFrame (Streaming execution). </summary>
     let collectStreaming (lf: LazyFrame) : DataFrame =
         let lfClone = lf.CloneHandle()
-        new DataFrame(PolarsWrapper.CollectStreaming(lfClone))
-
-    let over (partitionBy: Expr list) (e: Expr) = e.Over(partitionBy)
-    // SQL entry
+        new DataFrame(PolarsWrapper.CollectStreaming lfClone)
+    /// <summary> Define a window over which to perform an aggregation. </summary>
+    let over (partitionBy: Expr list) (e: Expr) = e.Over partitionBy
+    /// <summary> Create a SQL context for executing SQL queries on LazyFrames. </summary>
     let sqlContext () = new SqlContext()
+    /// <summary> Execute a SQL query against the provided LazyFrames. </summary>
     let ifElse (predicate: Expr) (ifTrue: Expr) (ifFalse: Expr) : Expr =
         let p = predicate.CloneHandle()
         let t = ifTrue.CloneHandle()
@@ -305,7 +319,9 @@ module Polars =
         new Expr(PolarsWrapper.IfElse(p, t, f))
 
     // --- Show / Helper ---
-
+    /// <summary>
+    /// Format a value from an Arrow column for display.
+    /// </summary>
     let rec formatValue (col: IArrowArray) (index: int) : string =
         if col.IsNull index then "null"
         else
@@ -344,7 +360,7 @@ module Polars =
             // --- Date) ---
             | :? Date32Array as arr -> 
                 let v = arr.GetValue(index).Value
-                DateTime(1970, 1, 1).AddDays(float v).ToString("yyyy-MM-dd")
+                DateTime(1970, 1, 1).AddDays(float v).ToString "yyyy-MM-dd"
             
             // --- Timestamp ---
             | :? TimestampArray as arr ->
@@ -358,7 +374,7 @@ module Polars =
                     | TimeUnit.Second -> v * 10000000L 
                     | _ -> v
                 
-                try DateTime.UnixEpoch.AddTicks(ticks).ToString("yyyy-MM-dd HH:mm:ss.ffffff")
+                try DateTime.UnixEpoch.AddTicks(ticks).ToString "yyyy-MM-dd HH:mm:ss.ffffff"
                 with _ -> v.ToString()
 
             // --- Time ---
@@ -402,8 +418,8 @@ module Polars =
                 sprintf "[%s]" (String.Join(", ", items))
 
             | :? LargeListArray as arr -> 
-                let start = int (arr.ValueOffsets.[index])
-                let end_ = int (arr.ValueOffsets.[index + 1])
+                let start = int arr.ValueOffsets.[index]
+                let end_ = int arr.ValueOffsets.[index + 1]
                 let items = [ for i in start .. end_ - 1 -> formatValue arr.Values i ]
                 sprintf "[%s]" (String.Join(", ", items))
 
@@ -421,7 +437,7 @@ module Polars =
             | _ -> sprintf "<%s>" (col.GetType().Name)
 
     /// <summary>
-    /// Show Rows of DataFrame, need to set row numbers.
+    /// Show first N lines of DataFrame
     /// </summary>
     let showRows (rows: int) (df: DataFrame) : DataFrame =
         let totalRows = df.Rows
@@ -434,7 +450,7 @@ module Polars =
         let fields = batch.Schema.FieldsList
         
         for field in fields do
-            let col = batch.Column(field.Name)
+            let col = batch.Column field.Name
             let typeName = field.DataType.Name 
             
             printfn "[%s: %s]" field.Name typeName
@@ -450,7 +466,7 @@ module Polars =
         df
 
     /// <summary>
-    /// Show first 10 lines of DataFrame 
+    /// Show first 10 lines of DataFrame
     /// </summary>
     let show (df: DataFrame) : DataFrame =
         showRows 10 df
