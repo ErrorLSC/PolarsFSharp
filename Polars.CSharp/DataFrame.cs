@@ -66,7 +66,23 @@ public class DataFrame : IDisposable
         //
         return new DataFrame(PolarsWrapper.FromArrow(batch));
     }
+    /// <summary>
+    /// Read a CSV file asynchronously.
+    /// </summary>
+    public static async Task<DataFrame> ReadCsvAsync(string path, bool tryParseDates = true)
+    {
+        var handle = await PolarsWrapper.ReadCsvAsync(path, tryParseDates);
+        return new DataFrame(handle);
+    }
 
+    /// <summary>
+    /// Read a Parquet file asynchronously.
+    /// </summary>
+    public static async Task<DataFrame> ReadParquetAsync(string path)
+    {
+        var handle = await PolarsWrapper.ReadParquetAsync(path);
+        return new DataFrame(handle);
+    }
     // ==========================================
     // Properties
     // ==========================================

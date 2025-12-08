@@ -343,10 +343,10 @@ module Polars =
     // --- Async IO ---
 
     /// <summary> Asynchronously read a CSV file into a DataFrame. </summary>
-    let readCsvAsync (path: string) : Async<DataFrame> =
+    let readCsvAsync (path: string) (tryParseDates: bool option) : Async<DataFrame> =
         async {
-            // 调用 C# Task，并用 Async.AwaitTask 转回 F# Async
-            let! handle = PolarsWrapper.ReadCsvAsync path |> Async.AwaitTask
+            let parseDates = defaultArg tryParseDates true
+            let! handle = PolarsWrapper.ReadCsvAsync(path,parseDates) |> Async.AwaitTask
             return new DataFrame(handle)
         }
     // --- Async Execution ---

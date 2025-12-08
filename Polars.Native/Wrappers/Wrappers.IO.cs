@@ -10,9 +10,9 @@ public static partial class PolarsWrapper
         if (!File.Exists(path)) throw new FileNotFoundException($"CSV not found: {path}");
         return ErrorHelper.Check(NativeBindings.pl_read_csv(path, tryParseDates));
     }
-    public static Task<DataFrameHandle> ReadCsvAsync(string path)
+    public static Task<DataFrameHandle> ReadCsvAsync(string path, bool tryParseDates)
     {
-        return Task.Run(() => ReadCsv(path, true));
+        return Task.Run(() => ReadCsv(path, tryParseDates));
     }
     public static LazyFrameHandle ScanCsv(string path, bool tryParseDates)
     {
@@ -25,7 +25,10 @@ public static partial class PolarsWrapper
          if (!File.Exists(path)) throw new FileNotFoundException($"Parquet not found: {path}");
          return ErrorHelper.Check(NativeBindings.pl_read_parquet(path));
     }
-
+    public static Task<DataFrameHandle> ReadParquetAsync(string path)
+    {
+        return Task.Run(() => ReadParquet(path));
+    }
     public static LazyFrameHandle ScanParquet(string path) {
         if (!File.Exists(path)) throw new FileNotFoundException($"Parquet not found: {path}");
         return ErrorHelper.Check(NativeBindings.pl_scan_parquet(path));

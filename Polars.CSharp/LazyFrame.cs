@@ -304,7 +304,14 @@ public class LazyFrame : IDisposable
         //
         return new DataFrame(PolarsWrapper.CollectStreaming(Handle));
     }
-
+    /// <summary>
+    /// Execute the query plan asynchronously and return a DataFrame.
+    /// </summary>
+    public async Task<DataFrame> CollectAsync()
+    {
+        var dfHandle = await PolarsWrapper.LazyCollectAsync(Handle);
+        return new DataFrame(dfHandle);
+    }
     // ==========================================
     // Output Sink (IO)
     // ==========================================
