@@ -178,6 +178,17 @@ public static partial class PolarsWrapper
         lf.TransferOwnership();
         return ErrorHelper.Check(df);
     }
+    public static Task<DataFrameHandle> LazyCollectAsync(LazyFrameHandle handle)
+    {
+        // LazyFrame 收集是重头戏，必须异步
+        // 注意：这里需要 CloneHandle 吗？
+        // 因为 Task.Run 是在另一个线程跑，为了线程安全，最好传一个 Clone 进去，
+        // 或者因为我们只是读 handle 指针，只要保证在 Task 结束前 handle 不被 dispose 即可。
+        // 但为了保险，建议由调用者（F#层）负责 Clone，或者我们在内部 Clone。
+        // 这里假设传入的 handle 在 Task 完成前有效。
+        
+        return Task.Run(() => LazyCollect(handle));
+    }
     // --- Clone Ops ---
     public static LazyFrameHandle LazyClone(LazyFrameHandle lf)
     {

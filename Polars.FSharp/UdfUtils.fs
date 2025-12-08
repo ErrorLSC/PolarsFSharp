@@ -39,7 +39,6 @@ module Udf =
             append, fun () -> b.Build() :> IArrowArray
 
         | DataType.String ->
-            // Polars 0.50+ 推荐使用 StringViewArray
             let b = (new StringViewArray.Builder()).Reserve capacity
             let append (v: obj option) =
                 match v with
@@ -94,9 +93,9 @@ module Udf =
         | :? string ->
             match arr with
             | :? StringArray as sa -> 
-                fun i -> if sa.IsNull(i) then None else Some (unbox<'T> (sa.GetString(i)))
+                fun i -> if sa.IsNull(i) then None else Some (unbox<'T> (sa.GetString i))
             | :? StringViewArray as sva ->
-                fun i -> if sva.IsNull(i) then None else Some (unbox<'T> (sva.GetString(i)))
+                fun i -> if sva.IsNull(i) then None else Some (unbox<'T> (sva.GetString i))
             | _ -> failwithf "Cannot read %s as string" (arr.GetType().Name)
             
         | :? bool ->

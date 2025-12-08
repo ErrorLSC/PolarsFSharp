@@ -221,3 +221,15 @@ type ``Basic Functionality Tests`` () =
         Assert.Equal(3L, res.Int("a", 1).Value)
         Assert.True(res.Int("b", 1).IsNone) // b 应该是 null
         Assert.Equal(4L, res.Int("c", 1).Value)
+    [<Fact>]
+    member _.``Async: Collect LazyFrame`` () =
+        // 构造一个稍微大一点的计算任务
+        use csv1 = new TempCsv "a,b\n1,2\n3,4"
+        let df = 
+            Polars.scanCsv csv1.Path None
+            |> Polars.filterLazy (Polars.col "a" .> Polars.lit 0)
+            |> Polars.collectAsync // 返回 Async<DataFrame>
+            |> Async.RunSynchronously // 在测试里阻塞等待结果
+
+        Assert.Equal(2L, df.Rows)
+        Assert.Equal(1L, df.Int("a", 0).Value)

@@ -10,7 +10,10 @@ public static partial class PolarsWrapper
         if (!File.Exists(path)) throw new FileNotFoundException($"CSV not found: {path}");
         return ErrorHelper.Check(NativeBindings.pl_read_csv(path, tryParseDates));
     }
-
+    public static Task<DataFrameHandle> ReadCsvAsync(string path)
+    {
+        return Task.Run(() => ReadCsv(path, true));
+    }
     public static LazyFrameHandle ScanCsv(string path, bool tryParseDates)
     {
         if (!File.Exists(path)) throw new FileNotFoundException($"CSV not found: {path}");

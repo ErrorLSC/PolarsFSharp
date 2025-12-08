@@ -8,6 +8,7 @@ open Polars.Native
 /// </summary>
 module Polars =
     open Apache.Arrow.Types
+    open System.Threading.Tasks
     
     // --- Factories ---
     /// <summary> Reference a column by name. </summary>
@@ -339,7 +340,35 @@ module Polars =
         let f = ifFalse.CloneHandle()
         
         new Expr(PolarsWrapper.IfElse(p, t, f))
+    // --- Async IO ---
 
+    /// <summary> Asynchronously read a CSV file into a DataFrame. </summary>
+    let readCsvAsync (path: string) : Async<DataFrame> =
+        async {
+            // 调用 C# Task，并用 Async.AwaitTask 转回 F# Async
+            let! handle = PolarsWrapper.ReadCsvAsync path |> Async.AwaitTask
+            return new DataFrame(handle)
+        }
+    // --- Async Execution ---
+
+    /// <summary> 
+    /// Asynchronously execute the LazyFrame query plan. 
+    /// Useful for keeping UI responsive during heavy calculations.
+    /// </summary>
+    let collectAsync (lf: LazyFrame) : Async<DataFrame> =
+        async {
+            // 这里必须 CloneHandle！
+            // 因为 collectAsync 会立即返回一个 Async 对象，
+            // 原始的 lf 可能会在 Async 还没真正运行前就被 dispose 或者修改（虽然 LazyFrame 是不可变的）。
+            // 最安全的方式是让后台线程持有一个独立的 Handle。
+            let lfClone = lf.CloneHandle()
+            
+            let! dfHandle = 
+                Task.Run(fun () -> PolarsWrapper.LazyCollect lfClone) 
+                |> Async.AwaitTask
+                
+            return new DataFrame(dfHandle)
+        }
     // --- Show / Helper ---
     /// <summary>
     /// Format a value from an Arrow column for display.
