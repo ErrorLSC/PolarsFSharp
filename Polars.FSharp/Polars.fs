@@ -492,3 +492,4 @@ module Polars =
     /// </summary>
     let show (df: DataFrame) : DataFrame =
         showRows 10 df
+

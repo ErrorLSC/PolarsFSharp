@@ -108,7 +108,7 @@ type ``UDF Tests`` () =
                 Polars.col "num"
                 // 2. 直接调用 Udf.map
                 // 泛型 'T 和 'U 会自动推断为 int 和 string
-                |> fun e -> e.Map(Udf.map myLogic, Polars.Native.PlDataType.String) 
+                |> fun e -> e.Map(Udf.map myLogic DataType.String, PlDataType.String) 
                 |> Polars.alias "res"
             )
             |> Polars.selectLazy [ Polars.col "res" ]
@@ -120,3 +120,41 @@ type ``UDF Tests`` () =
         
         Assert.Equal("Num: 101", col.GetString 0)
         Assert.Equal(1, col.Length)
+    [<Fact>]
+    member _.``UDF: Map with Option (Null Handling)`` () =
+        // 数据: [10, 20, null]
+        // 注意: CSV 最后一行写 null 还是空行取决于解析器，这里用空行配合 Polars 默认行为
+        use csv = new TempCsv "val\n10\n20\n" 
+        let lf = Polars.scanCsv csv.Path None
+
+        // 逻辑: 
+        // 输入是 int option
+        // 如果有值且 > 15 -> 返回 Some (x * 2)
+        // 否则 (<= 15 或原本就是 null) -> 返回 None (即 null)
+        let logic (opt: int option) =
+            match opt with
+            | Some x when x > 15 -> Some (x * 2)
+            | _ -> None
+
+        let df = 
+            lf 
+            |> Polars.withColumnLazy (
+                Polars.col "val"
+                // 使用 mapOption，显式处理 Option 类型
+                |> fun e -> e.Map(Udf.mapOption logic DataType.Int32, PlDataType.Int32)
+                |> Polars.alias "res"
+            )
+            |> Polars.collect
+
+        // 验证
+        let arrow = df.ToArrow()
+        let col = arrow.Column "res" :?> Int32Array // 注意根据 DataType.Int32 生成的是 Int32Array
+
+        // Row 0: 10 -> (<=15) -> None
+        Assert.True(col.IsNull 0)
+
+        // Row 1: 20 -> (>15) -> 40
+        Assert.Equal(40, col.GetValue(1).Value)
+
+        // Row 2: null -> (None) -> None
+        Assert.True(col.IsNull 2)
