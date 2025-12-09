@@ -62,7 +62,81 @@ public static partial class PolarsWrapper
             }
         }
     }
+    // 预计算 10 的幂次，避免重复 Math.Pow
+    private static readonly decimal[] PowersOf10;
+
+    static PolarsWrapper()
+    {
+        PowersOf10 = new decimal[29]; // 0 .. 28
+        PowersOf10[0] = 1m;
+        for (int i = 1; i < PowersOf10.Length; i++)
+        {
+            PowersOf10[i] = PowersOf10[i - 1] * 10m;
+        }
+    }
+
+    public static SeriesHandle SeriesNewDecimal(string name, decimal[] data, bool[]? validity, int scale)
+    {
+        if (scale < 0 || scale >= PowersOf10.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(scale), $"Scale must be between 0 and {PowersOf10.Length - 1} for C# decimal conversion.");
+        }
+        var len = data.Length;
+        var scaledValues = new Int128[len];
+        var multiplier = PowersOf10[scale]; // 获取乘数 (例如 scale=2 -> 100)
+
+        // 转换逻辑：将 C# decimal 变成纯整数 Int128
+        for (int i = 0; i < len; i++)
+        {
+            // 注意：这里可能会溢出 decimal 的范围，但在金融场景通常还好
+            // 直接乘法会自动处理符号
+            scaledValues[i] = (Int128)(data[i] * multiplier);
+        }
+
+        return ErrorHelper.Check(NativeBindings.pl_series_new_decimal(
+            name, 
+            scaledValues, 
+            ToBytes(validity), 
+            (UIntPtr)len, 
+            (UIntPtr)scale
+        ));
+    }
     
+    // 可空版本 (Option)
+    public static SeriesHandle SeriesNewDecimal(string name, decimal?[] data, int scale)
+    {
+        if (scale < 0 || scale >= PowersOf10.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(scale), $"Scale must be between 0 and {PowersOf10.Length - 1} for C# decimal conversion.");
+        }
+        var len = data.Length;
+        var scaledValues = new Int128[len];
+        var validity = new byte[len];
+        var multiplier = PowersOf10[scale];
+
+        for (int i = 0; i < len; i++)
+        {
+            var value = data[i];
+            if (value.HasValue)
+            {
+                scaledValues[i] = (Int128)(value.Value * multiplier);
+                validity[i] = 1;
+            }
+            else
+            {
+                scaledValues[i] = 0;
+                validity[i] = 0;
+            }
+        }
+
+        return ErrorHelper.Check(NativeBindings.pl_series_new_decimal(
+            name, 
+            scaledValues, 
+            validity, 
+            (UIntPtr)len, 
+            (UIntPtr)scale
+        ));
+    }
     // --- Properties ---
 
     public static long SeriesLen(SeriesHandle h) => (long)NativeBindings.pl_series_len(h);

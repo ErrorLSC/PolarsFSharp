@@ -1,6 +1,9 @@
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Apache.Arrow;
 using Apache.Arrow.C;
+
+[assembly: DisableRuntimeMarshalling]
 
 namespace Polars.Native;
 
@@ -450,7 +453,14 @@ unsafe internal partial class NativeBindings
     // 字符串类型：IntPtr[] 里的 IntPtr.Zero 代表 null
     [LibraryImport(LibName, StringMarshalling = StringMarshalling.Utf8)]
     public static partial SeriesHandle pl_series_new_str(string name, IntPtr[] strs, UIntPtr len);
-
+    [LibraryImport(LibName, StringMarshalling = StringMarshalling.Utf8)]
+    public static partial SeriesHandle pl_series_new_decimal(
+        string name, 
+        Int128[] ptr,      // 对应 Rust 的 *const i128
+        byte[]? validity, 
+        UIntPtr len,
+        UIntPtr scale
+    );
     // --- Series Properties ---
     [LibraryImport(LibName)]
     public static partial UIntPtr pl_series_len(SeriesHandle h);

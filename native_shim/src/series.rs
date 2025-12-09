@@ -132,7 +132,39 @@ pub extern "C" fn pl_series_new_str(
     let series = Series::new(name.into(), &vec_opts);
     Box::into_raw(Box::new(SeriesContext { series }))
 }
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_series_new_decimal(
+    name: *const c_char,
+    ptr: *const i128,       // 这里的 i128 存储的是缩放后的整数 (如 1.23 -> 123)
+    validity: *const bool,
+    len: usize,
+    scale: usize            // 必须指定 scale，否则只是普通的 Int128
+) -> *mut SeriesContext {
+    let name = unsafe { CStr::from_ptr(name).to_string_lossy() };
+    
+    // 1. 构建基础数据 (Vec<Option<i128>>)
+    let slice = unsafe { std::slice::from_raw_parts(ptr, len) };
+    let series = if validity.is_null() {
+        Series::new(name.clone().into(), slice)
+    } else {
+        let v_slice = unsafe { std::slice::from_raw_parts(validity, len) };
+        let opts: Vec<Option<i128>> = slice.iter().zip(v_slice.iter())
+            .map(|(&v, &valid)| if valid { Some(v) } else { None })
+            .collect();
+        Series::new(name.clone().into(), &opts)
+    };
 
+    let decimal_series = if let Ok(ca) = series.i128() {
+        // into_decimal(precision, scale)
+        // None precision = Auto (Max 38)
+        ca.clone().into_decimal(None, scale).unwrap().into_series()
+    } else {
+        // 理论上不可能走到这里，因为 Series::new 创建的就是 Int128
+        series
+    };
+
+    Box::into_raw(Box::new(SeriesContext { series: decimal_series }))
+}
 // ==========================================
 // Methods
 // ==========================================

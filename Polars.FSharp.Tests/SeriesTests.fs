@@ -129,3 +129,19 @@ type ``Series Tests`` () =
         Assert.Equal(1.23m, decArr.GetValue(0).Value)
         Assert.Equal(4.56m, decArr.GetValue(1).Value) // 完美通过
         Assert.Equal(7.89m, decArr.GetValue(2).Value)
+    [<Fact>]
+    member _.``Series: Create Decimal (High Performance)`` () =
+        // 数据: 1.23, 4.56
+        // 我们指定 Scale = 2
+        let data = [1.23m; 4.56m; 7.89m] 
+        
+        // 使用新加的 create 方法
+        use s = Series.create("money", data, 2)
+        
+        // 验证
+        let arrow = s.ToArrow() :?> Apache.Arrow.Decimal128Array
+        
+        // 这次 4.56m 进去，出来的必定是 4.56m
+        // 因为我们在 C# 端做了 * 100 操作：4.56m * 100m = 456m -> (Int128)456
+        // 绝对没有浮点数中间商赚差价
+        Assert.Equal(4.56m, arrow.GetValue(1).Value)

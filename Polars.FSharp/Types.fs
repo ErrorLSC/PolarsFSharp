@@ -444,7 +444,23 @@ type Series(handle: SeriesHandle) =
         // 将 Option 转换为 string array (None -> null)
         let vals = arr |> Array.map (fun opt -> match opt with Some s -> s | None -> null)
         new Series(PolarsWrapper.SeriesNew(name, vals))
+    // --- Decimal ---
+    
+    /// <summary>
+    /// Create a Decimal Series.
+    /// scale: The number of decimal places (e.g., 2 for currency).
+    /// </summary>
+    static member create(name: string, data: decimal seq, scale: int) = 
+        new Series(PolarsWrapper.SeriesNewDecimal(name, Seq.toArray data, null, scale))
 
+    static member create(name: string, data: decimal option seq, scale: int) = 
+        let arr = Seq.toArray data // decimal option[]
+        // 转换逻辑稍复杂，我们在 Wrapper 里处理了 nullable 数组转换
+        // 这里我们需要把 seq<decimal option> 转为 decimal?[] (Nullable<decimal>[]) 传给 C#
+        let nullableArr = 
+            arr |> Array.map (function Some v -> System.Nullable(v) | None -> System.Nullable())
+            
+        new Series(PolarsWrapper.SeriesNewDecimal(name, nullableArr, scale))
     // ==========================================
     // Interop with DataFrame
     // ==========================================
