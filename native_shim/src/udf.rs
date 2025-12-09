@@ -1,6 +1,7 @@
 use polars::prelude::*;
 use polars_arrow::ffi;
-use crate::types::{ExprContext, map_datatype};
+use crate::types::{ExprContext};
+use crate::datatypes::DataTypeContext;
 use std::sync::Arc;
 use polars_arrow::datatypes::Field as ArrowField;
 use std::ffi::{CStr,c_void};
@@ -92,21 +93,21 @@ impl CSharpUdf {
 pub extern "C" fn pl_expr_map(
     expr_ptr: *mut ExprContext,
     callback: UdfCallback,
-    return_type_code: i32,
+    output_type_ptr: *mut DataTypeContext,
     cleanup: CleanupCallback,
     user_data: *mut c_void // 接收 C# 的 GCHandle.ToIntPtr()
 ) -> *mut ExprContext {
     ffi_try!({
         let ctx = unsafe { Box::from_raw(expr_ptr) };
         let udf = Arc::new(CSharpUdf { callback,cleanup,user_data });
-        let target_dtype = map_datatype(return_type_code);
+        let target_dtype = unsafe { &(*output_type_ptr).dtype };
         // [核心逻辑] 构建 GetOutput
         let output_type = match target_dtype {
             // 如果是 Unknown (0)，说明用户没指定，我们假设输出类型 == 输入类型
             DataType::Unknown(UnknownKind::Any) => GetOutput::map_field(|f| Ok(f.clone())),
             
             // 否则，指定具体的返回类型 (如 String, Float64)
-            _ => GetOutput::from_type(target_dtype),
+            _ => GetOutput::from_type((*target_dtype).clone()),
         };
 
         let new_expr = ctx.inner.map(

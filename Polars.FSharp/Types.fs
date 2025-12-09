@@ -17,29 +17,30 @@ type DataType =
     | Binary
     | Categorical
     | Decimal of precision: int option * scale: int
-    | Unknown
+    | Unknown | SameAsInput
 
     // 转换 helper
     member internal this.CreateHandle() =
         match this with
-        | Boolean -> PolarsWrapper.NewPrimitiveType 0
-        | Int8 -> PolarsWrapper.NewPrimitiveType 1
-        | Int16 -> PolarsWrapper.NewPrimitiveType 2
-        | Int32 -> PolarsWrapper.NewPrimitiveType 3
-        | Int64 -> PolarsWrapper.NewPrimitiveType 4
-        | UInt8 -> PolarsWrapper.NewPrimitiveType 5
-        | UInt16 -> PolarsWrapper.NewPrimitiveType 6
-        | UInt32 -> PolarsWrapper.NewPrimitiveType 7
-        | UInt64 -> PolarsWrapper.NewPrimitiveType 8
-        | Float32 -> PolarsWrapper.NewPrimitiveType 9
-        | Float64 -> PolarsWrapper.NewPrimitiveType 10
-        | String -> PolarsWrapper.NewPrimitiveType 11
-        | Date -> PolarsWrapper.NewPrimitiveType 12
-        | Datetime -> PolarsWrapper.NewPrimitiveType 13
-        | Time -> PolarsWrapper.NewPrimitiveType 14
-        | Duration -> PolarsWrapper.NewPrimitiveType 15
-        | Binary -> PolarsWrapper.NewPrimitiveType 16
-        | Unknown -> PolarsWrapper.NewPrimitiveType -1
+        | SameAsInput -> PolarsWrapper.NewPrimitiveType 0
+        | Boolean -> PolarsWrapper.NewPrimitiveType 1
+        | Int8 -> PolarsWrapper.NewPrimitiveType 2
+        | Int16 -> PolarsWrapper.NewPrimitiveType 3
+        | Int32 -> PolarsWrapper.NewPrimitiveType 4
+        | Int64 -> PolarsWrapper.NewPrimitiveType 5
+        | UInt8 -> PolarsWrapper.NewPrimitiveType 6
+        | UInt16 -> PolarsWrapper.NewPrimitiveType 7
+        | UInt32 -> PolarsWrapper.NewPrimitiveType 8
+        | UInt64 -> PolarsWrapper.NewPrimitiveType 9
+        | Float32 -> PolarsWrapper.NewPrimitiveType 10
+        | Float64 -> PolarsWrapper.NewPrimitiveType 11
+        | String -> PolarsWrapper.NewPrimitiveType 12
+        | Date -> PolarsWrapper.NewPrimitiveType 13
+        | Datetime -> PolarsWrapper.NewPrimitiveType 14
+        | Time -> PolarsWrapper.NewPrimitiveType 15
+        | Duration -> PolarsWrapper.NewPrimitiveType 16
+        | Binary -> PolarsWrapper.NewPrimitiveType 17
+        | Unknown -> PolarsWrapper.NewPrimitiveType 0
         | Categorical -> PolarsWrapper.NewCategoricalType()
         | Decimal (p, s) -> 
             let prec = defaultArg p 0 // 0 means None in Rust shim
@@ -187,10 +188,12 @@ type Expr(handle: ExprHandle) =
     /// Apply a custom C# function (UDF) to the expression.
     /// The function receives an Apache Arrow Array and returns an Arrow Array.
     /// </summary>
+    member this.Map(func: Func<IArrowArray, IArrowArray>, outputType: DataType) =
+        use typeHandle = outputType.CreateHandle()
+        let newHandle = PolarsWrapper.Map(this.CloneHandle(), func, typeHandle)
+        new Expr(newHandle)
     member this.Map(func: Func<IArrowArray, IArrowArray>) =
-        new Expr(PolarsWrapper.Map(this.CloneHandle(), func))
-    member this.Map(func: Func<IArrowArray, IArrowArray>, outputType: PlDataType) =
-        new Expr(PolarsWrapper.Map(this.CloneHandle(), func, outputType))
+        this.Map(func, DataType.SameAsInput)
     /// Advanced
     /// <summary> Explode a list column into multiple rows. </summary>
     member this.Explode() = new Expr(PolarsWrapper.Explode(this.CloneHandle()))

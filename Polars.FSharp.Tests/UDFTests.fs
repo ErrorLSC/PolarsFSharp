@@ -55,7 +55,7 @@ type ``UDF Tests`` () =
             lf 
             |> Polars.withColumnLazy (
                 Polars.col "num"
-                |> fun e -> e.Map(udf, PlDataType.String)
+                |> fun e -> e.Map(udf, DataType.String)
                 |> Polars.alias "desc"
             )
             |> Polars.selectLazy [ Polars.col "desc" ]
@@ -81,7 +81,7 @@ type ``UDF Tests`` () =
             lf 
             |> Polars.withColumnLazy (
                 Polars.col "num" 
-                |> fun e -> e.Map(udf, PlDataType.SameAsInput)
+                |> fun e -> e.Map(udf, DataType.SameAsInput)
             )
             // UDF 是 Lazy 执行的，只有 Collect/ToArrow 时才会触发
             |> Polars.collect 
@@ -108,7 +108,7 @@ type ``UDF Tests`` () =
                 Polars.col "num"
                 // 2. 直接调用 Udf.map
                 // 泛型 'T 和 'U 会自动推断为 int 和 string
-                |> fun e -> e.Map(Udf.map myLogic DataType.String, PlDataType.String) 
+                |> fun e -> e.Map(Udf.map myLogic DataType.String, DataType.String) 
                 |> Polars.alias "res"
             )
             |> Polars.selectLazy [ Polars.col "res" ]
@@ -141,7 +141,7 @@ type ``UDF Tests`` () =
             |> Polars.withColumnLazy (
                 Polars.col "val"
                 // 使用 mapOption，显式处理 Option 类型
-                |> fun e -> e.Map(Udf.mapOption logic DataType.Int32, PlDataType.Int32)
+                |> fun e -> e.Map(Udf.mapOption logic DataType.Int32, DataType.Int32)
                 |> Polars.alias "res"
             )
             |> Polars.collect
@@ -158,3 +158,40 @@ type ``UDF Tests`` () =
 
         // Row 2: null -> (None) -> None
         Assert.True(col.IsNull 2)
+    [<Fact>]
+    member _.``UDF: Decimal Map`` () =
+        // 1. 准备数据: String -> Decimal
+        // 源数据是字符串 "10.50", "20.25"
+        let data = ["10.50"; "20.25"; null]
+        use s = Series.create("str_vals", data)
+        use df = s.ToFrame()
+
+        // 2. 定义 Decimal 逻辑
+        // 输入: decimal option
+        // 输出: decimal option (乘以 2)
+        let logic (opt: decimal option) =
+            opt |> Option.map (fun d -> d * 2m)
+
+        // 3. 执行 UDF
+        // 先 Cast 成 Decimal，再跑 UDF，再输出 Decimal
+        // 注意：Series.Cast 已经支持了
+        use sDec = s.Cast(DataType.Decimal(Some 10, 2))
+        
+        // 这里的 DataType.Decimal(Some 10, 2) 会告诉 createBuilder 创建 Decimal128Array
+        let res = 
+            sDec.ToFrame()
+
+            // 或者我们可以直接在 Series 上实现 Map? 目前 Series.Map 没暴露，只有 Expr.Map
+            // 我们用 Expr 方式：
+            |> Polars.withColumn (
+                Polars.col("str_vals")
+                    .Cast(DataType.Decimal(Some 10, 2)) // 先转 Decimal
+                    .Map(Udf.mapOption logic (DataType.Decimal(Some 10, 2)), DataType.Decimal(Some 10, 2)) // 跑 UDF
+                    .Alias "doubled"
+            )// 这里如果源是 Eager DataFrame，withColumn 返回 Eager DataFrame
+        
+        let arrow = res.ToArrow()
+        let col = arrow.Column "doubled" :?> Decimal128Array
+        Assert.Equal(21.00m, col.GetValue(0).Value)
+        Assert.Equal(40.50m, col.GetValue(1).Value)
+        Assert.True(col.IsNull(2))

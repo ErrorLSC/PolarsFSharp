@@ -12,23 +12,23 @@ pub struct DataTypeContext {
 #[unsafe(no_mangle)]
 pub extern "C" fn pl_datatype_new_primitive(code: i32) -> *mut DataTypeContext {
     let dtype = match code {
-        0 => DataType::Boolean,
-        1 => DataType::Int8,
-        2 => DataType::Int16,
-        3 => DataType::Int32,
-        4 => DataType::Int64,
-        5 => DataType::UInt8,
-        6 => DataType::UInt16,
-        7 => DataType::UInt32,
-        8 => DataType::UInt64,
-        9 => DataType::Float32,
-        10 => DataType::Float64,
-        11 => DataType::String,
-        12 => DataType::Date,
-        13 => DataType::Datetime(TimeUnit::Microseconds, None), // 默认无时区
-        14 => DataType::Time,
-        15 => DataType::Duration(TimeUnit::Microseconds),
-        16 => DataType::Binary,
+        1 => DataType::Boolean,
+        2 => DataType::Int8,
+        3 => DataType::Int16,
+        4 => DataType::Int32,
+        5 => DataType::Int64,
+        6 => DataType::UInt8,
+        7 => DataType::UInt16,
+        8 => DataType::UInt32,
+        9 => DataType::UInt64,
+        10 => DataType::Float32,
+        11 => DataType::Float64,
+        12 => DataType::String,
+        13 => DataType::Date,
+        14 => DataType::Datetime(TimeUnit::Microseconds, None), // 默认无时区
+        15 => DataType::Time,
+        16 => DataType::Duration(TimeUnit::Microseconds),
+        17 => DataType::Binary,
         _ => DataType::Unknown(UnknownKind::Any),
     };
     Box::into_raw(Box::new(DataTypeContext { dtype }))

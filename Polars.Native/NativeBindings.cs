@@ -160,7 +160,7 @@ unsafe internal partial class NativeBindings
     public static partial ExprHandle pl_expr_map(
         ExprHandle expr, 
         UdfCallback callback, 
-        PlDataType returnType,
+        DataTypeHandle returnType,
         CleanupCallback cleanup,
         IntPtr userData          
     );

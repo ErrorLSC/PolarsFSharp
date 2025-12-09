@@ -15,7 +15,7 @@ public class Expr : IDisposable
     {
         Handle = handle;
     }
-
+    private ExprHandle CloneHandle() => PolarsWrapper.CloneExpr(Handle);
     /// <summary>
     /// Creates an expression evaluating if the left operand is greater than the right operand.
     /// </summary>
@@ -347,7 +347,7 @@ public class Expr : IDisposable
     public Expr Cast(DataType dtype, bool strict = false)
     {
         var h = PolarsWrapper.CloneExpr(Handle);
-        return new Expr(PolarsWrapper.Cast(h, dtype.ToNative(), strict));
+        return new Expr(PolarsWrapper.ExprCast(h, dtype.Handle, strict));
     }
     // ==========================================
     // UDF / Map
@@ -360,28 +360,127 @@ public class Expr : IDisposable
     /// <typeparam name="TOutput">Output type (e.g. int, double, string)</typeparam>
     /// <param name="function">The function to apply.</param>
     /// <param name="outputType">The Polars data type of the output column.</param>
+/// <summary>
+    /// Apply a custom C# function to the expression (High-Level).
+    /// </summary>
     public Expr Map<TInput, TOutput>(Func<TInput, TOutput> function, DataType outputType)
     {
         // 1. 将用户的强类型 Func 转换为 Arrow Func
         var arrowFunc = UdfUtils.Wrap(function);
 
-        // 2. Clone Handle (因为 Map 会消耗它)
+        // 2. Clone Handle
         var h = PolarsWrapper.CloneExpr(Handle);
 
-        // 3. 调用底层 Wrapper
-        return new Expr(PolarsWrapper.Map(h, arrowFunc, outputType.ToNative()));
+        // 3. 调用底层 Wrapper (传递 DataType.Handle)
+        return new Expr(PolarsWrapper.Map(h, arrowFunc, outputType.Handle));
     }
+
     /// <summary>
     /// Apply a raw Arrow-to-Arrow UDF. (Advanced / Internal use)
     /// </summary>
     public Expr Map(Func<IArrowArray, IArrowArray> function, DataType outputType)
     {
-        // 1. 直接使用用户提供的 Arrow 函数，不经过 UdfUtils 包装
+        // 1. 直接使用用户提供的 Arrow 函数
         // 2. Clone Handle
         var h = PolarsWrapper.CloneExpr(Handle);
 
-        // 3. 调用底层 Wrapper
-        return new Expr(PolarsWrapper.Map(h, function, outputType.ToNative()));
+        // 3. 调用底层 Wrapper (传递 DataType.Handle)
+        return new Expr(PolarsWrapper.Map(h, function, outputType.Handle));
+    }
+    // ==========================================
+    // Rolling Window Functions
+    // ==========================================
+    /// <summary>
+    /// Rolling Minimum
+    /// </summary>
+    /// <param name="windowSize"></param>
+    /// <returns></returns>
+    public Expr RollingMin(string windowSize) 
+        => new Expr(PolarsWrapper.RollingMin(CloneHandle(), windowSize));
+    /// <summary>
+    /// Rolling Maximum
+    /// </summary>
+    /// <param name="windowSize"></param>
+    /// <returns></returns>
+    public Expr RollingMax(string windowSize) 
+        => new Expr(PolarsWrapper.RollingMax(CloneHandle(), windowSize));
+    /// <summary>
+    /// Rolling Mean
+    /// </summary>
+    /// <param name="windowSize"></param>
+    /// <returns></returns>
+    public Expr RollingMean(string windowSize) 
+        => new Expr(PolarsWrapper.RollingMean(CloneHandle(), windowSize));
+    /// <summary>
+    /// Rolling Sum
+    /// </summary>
+    /// <param name="windowSize"></param>
+    /// <returns></returns>
+    public Expr RollingSum(string windowSize) 
+        => new Expr(PolarsWrapper.RollingSum(CloneHandle(), windowSize));
+    /// <summary>
+    /// Rolling Mean By
+    /// </summary>
+    /// <param name="windowSize"></param>
+    /// <param name="by"></param>
+    /// <param name="closed"></param>
+    /// <returns></returns>
+    public Expr RollingMeanBy(string windowSize, Expr by, string closed = "left")
+    {
+        return new Expr(PolarsWrapper.RollingMeanBy(
+            CloneHandle(), 
+            windowSize, 
+            by.CloneHandle(), 
+            closed
+        ));
+    }
+    /// <summary>
+    /// Rolling Sum By
+    /// </summary>
+    /// <param name="windowSize"></param>
+    /// <param name="by"></param>
+    /// <param name="closed"></param>
+    /// <returns></returns>
+    public Expr RollingSumBy(string windowSize, Expr by, string closed = "left")
+    {
+        return new Expr(PolarsWrapper.RollingSumBy(
+            CloneHandle(), 
+            windowSize, 
+            by.CloneHandle(), 
+            closed
+        ));
+    }
+    /// <summary>
+    /// Rolling Min By
+    /// </summary>
+    /// <param name="windowSize"></param>
+    /// <param name="by"></param>
+    /// <param name="closed"></param>
+    /// <returns></returns>
+    public Expr RollingMinBy(string windowSize, Expr by, string closed = "left")
+    {
+        return new Expr(PolarsWrapper.RollingMinBy(
+            CloneHandle(), 
+            windowSize, 
+            by.CloneHandle(), 
+            closed
+        ));
+    }
+    /// <summary>
+    /// Rolling Max By
+    /// </summary>
+    /// <param name="windowSize"></param>
+    /// <param name="by"></param>
+    /// <param name="closed"></param>
+    /// <returns></returns>
+    public Expr RollingMaxBy(string windowSize, Expr by, string closed = "left")
+    {
+        return new Expr(PolarsWrapper.RollingMaxBy(
+            CloneHandle(), 
+            windowSize, 
+            by.CloneHandle(), 
+            closed
+        ));
     }
     // ==========================================
     // Namespaces
@@ -406,6 +505,11 @@ public class Expr : IDisposable
     /// Access struct operations.
     /// </summary>
     public StructOps Struct => new StructOps(this);
+
+    /// <summary>
+    /// Access column renaming operations.
+    /// </summary>
+    public NameOps Name => new NameOps(this);
     // ---------------------------------------------------
     // Clean Up
     // ---------------------------------------------------
@@ -680,6 +784,50 @@ public class ListOps
         var h = PolarsWrapper.CloneExpr(_expr.Handle);
         return new Expr(PolarsWrapper.ListSort(h, descending));
     }
+    /// <summary>
+    /// Calculate the sum of the list elements.
+    /// </summary>
+    /// <returns></returns>
+    public Expr Sum() => Wrap(PolarsWrapper.ListSum);
+    /// <summary>
+    /// Calculate the minimum of the list elements.
+    /// </summary>
+    /// <returns></returns>
+    public Expr Min() => Wrap(PolarsWrapper.ListMin);
+    /// <summary>
+    /// Calculate the maximum of the list elements.
+    /// </summary>
+    /// <returns></returns>
+    public Expr Max() => Wrap(PolarsWrapper.ListMax);
+    /// <summary>
+    /// Calculate the mean of the list elements.
+    /// </summary>
+    /// <returns></returns>
+    public Expr Mean() => Wrap(PolarsWrapper.ListMean);
+    /// <summary>
+    /// Check if the list contains a specific item.
+    /// </summary>
+    /// <param name="item"></param>
+    /// <returns></returns>
+    public Expr Contains(Expr item)
+    {
+        var h = PolarsWrapper.CloneExpr(_expr.Handle);
+        var i = PolarsWrapper.CloneExpr(item.Handle);
+        return new Expr(PolarsWrapper.ListContains(h, i));
+    }
+    
+    /// <summary>
+    /// Check if the list contains a specific integer or string item.
+    /// </summary>
+    /// <param name="item"></param>
+    /// <returns></returns>
+    public Expr Contains(int item) => Contains(Polars.Lit(item));
+    /// <summary>
+    /// Check if the list contains a specific string item.
+    /// </summary>
+    /// <param name="item"></param>
+    /// <returns></returns>
+    public Expr Contains(string item) => Contains(Polars.Lit(item));
 }
 
 // ==========================================
@@ -701,4 +849,26 @@ public class StructOps
         var h = PolarsWrapper.CloneExpr(_expr.Handle);
         return new Expr(PolarsWrapper.StructFieldByName(h, name));
     }
+}
+/// <summary>
+/// Offers methods for renaming columns.
+/// </summary>
+public class NameOps
+{
+    private readonly Expr _expr;
+    internal NameOps(Expr expr) { _expr = expr; }
+    /// <summary>
+    /// Prefix the column name with a specified string.
+    /// </summary>
+    /// <param name="prefix"></param>
+    /// <returns></returns>
+    public Expr Prefix(string prefix) 
+        => new Expr(PolarsWrapper.Prefix(_expr.Handle, prefix)); // Wrapper 需确认签名
+    /// <summary>
+    /// Suffix the column name with a specified string.
+    /// </summary>
+    /// <param name="suffix"></param>
+    /// <returns></returns>
+    public Expr Suffix(string suffix) 
+        => new Expr(PolarsWrapper.Suffix(_expr.Handle, suffix));
 }

@@ -37,7 +37,19 @@ module Udf =
                 | Some x -> b.Append(unbox<double> x) |> ignore
                 | None -> b.AppendNull() |> ignore
             append, fun () -> b.Build() :> IArrowArray
-
+        | DataType.Decimal (pOpt, s) ->
+            // Arrow 需要显式的 Decimal128Type 来初始化 Builder
+            // 如果用户没给 precision，我们给个默认值 (比如 38，最大值)
+            let p = defaultArg pOpt 38
+            let arrowType = new Apache.Arrow.Types.Decimal128Type(p, s)
+            let b = (new Decimal128Array.Builder(arrowType)).Reserve(capacity)
+            
+            let append (v: obj option) =
+                match v with 
+                // C# Arrow Builder 支持直接 Append(decimal)
+                | Some x -> b.Append(unbox<decimal> x) |> ignore 
+                | None -> b.AppendNull() |> ignore
+            append, fun () -> b.Build() :> IArrowArray
         | DataType.String ->
             let b = (new StringViewArray.Builder()).Reserve capacity
             let append (v: obj option) =
@@ -45,7 +57,55 @@ module Udf =
                 | Some x -> b.Append(unbox<string> x) |> ignore
                 | None -> b.AppendNull() |> ignore
             append, fun () -> b.Build() :> IArrowArray
+        | DataType.Categorical ->
+            // 手动实现 Dictionary Builder 逻辑
+            // 1. 维护一个哈希表用于去重: Value -> Index
+            let lookup = System.Collections.Generic.Dictionary<string, int>()
             
+            // 2. 两个 Builder: 存唯一值的 StringArray，存索引的 UInt32Array
+            // Polars 默认使用 UInt32 作为物理索引
+            let valuesBuilder = new StringArray.Builder()
+            let indicesBuilder = (new UInt32Array.Builder()).Reserve(capacity)
+            
+            let append (v: obj option) =
+                match v with 
+                | None -> 
+                    // 空值直接在索引数组里存 null
+                    indicesBuilder.AppendNull() |> ignore
+                | Some objVal -> 
+                    let s = unbox<string> objVal
+                    // 检查是否已存在
+                    match lookup.TryGetValue(s) with
+                    | true, idx -> 
+                        // 已存在，直接存索引
+                        indicesBuilder.Append(uint32 idx) |> ignore
+                    | false, _ ->
+                        // 新值：
+                        // 1. 获取新索引 (即当前字典大小)
+                        let newIdx = lookup.Count
+                        // 2. 存入查找表
+                        lookup.Add(s, newIdx)
+                        // 3. 存入 Values 数组
+                        valuesBuilder.Append(s) |> ignore
+                        // 4. 存入 Indices 数组
+                        indicesBuilder.Append(uint32 newIdx) |> ignore
+
+            let build () =
+                // 1. 构建 Indices 和 Values 数组
+                let indices = indicesBuilder.Build()
+                let values = valuesBuilder.Build()
+                
+                // 2. 构建 DictionaryType (Key=UInt32, Value=String, Ordered=false)
+                let dictType = new Apache.Arrow.Types.DictionaryType(
+                    indices.Data.DataType,
+                    values.Data.DataType,
+                    false
+                )
+                
+                // 3. 组装最终的 DictionaryArray
+                new DictionaryArray(dictType, indices, values) :> IArrowArray
+
+            (append, build)
         | DataType.Boolean ->
             let b = (new BooleanArray.Builder()).Reserve capacity
             let append (v: obj option) =
@@ -89,13 +149,42 @@ module Udf =
             | :? FloatArray as a ->
                 fun i -> if a.IsNull(i) then None else Some (unbox<'T> (double (a.GetValue(i).Value)))
             | _ -> failwithf "Cannot read %s as double" (arr.GetType().Name)
-
+        | :? decimal ->
+            match arr with
+            | :? Decimal128Array as a -> 
+                // C# Arrow 会自动应用 Scale 将 Int128 转为 System.Decimal
+                fun i -> if a.IsNull(i) then None else Some (unbox<'T> (a.GetValue(i).Value))
+            | _ -> failwithf "Cannot read %s as decimal" (arr.GetType().Name)
         | :? string ->
             match arr with
             | :? StringArray as sa -> 
                 fun i -> if sa.IsNull(i) then None else Some (unbox<'T> (sa.GetString i))
             | :? StringViewArray as sva ->
                 fun i -> if sva.IsNull(i) then None else Some (unbox<'T> (sva.GetString i))
+            | :? DictionaryArray as da ->
+                // 这是一个通用的 Dictionary 读取器
+                // 注意：这里为了性能，我们应该在闭包外获取 Dictionary (Values) 数组
+                let values = da.Dictionary
+                let indices = da.Indices
+                
+                // 辅助函数：根据 Index 类型读取 Key
+                let getKey (idx: int) : int =
+                    match indices with
+                    | :? UInt32Array as arr -> if arr.IsNull(idx) then -1 else int (arr.GetValue(idx).Value)
+                    | :? Int32Array as arr -> if arr.IsNull(idx) then -1 else arr.GetValue(idx).Value
+                    | _ -> -1 // 其他类型暂略
+
+                // 辅助函数：根据 Dictionary 类型读取 String
+                let getVal (key: int) : string =
+                    match values with
+                    | :? StringArray as sa -> sa.GetString(key)
+                    | :? StringViewArray as sva -> sva.GetString(key)
+                    | _ -> ""
+
+                fun i -> 
+                    let key = getKey i
+                    if key < 0 then None else Some (unbox<'T> (getVal key))
+
             | _ -> failwithf "Cannot read %s as string" (arr.GetType().Name)
             
         | :? bool ->

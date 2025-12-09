@@ -254,7 +254,15 @@ type ``String Logic Tests`` () =
 
     [<Fact>]
     member _.``Cast Ops: Int to Float, String to Int`` () =
-        use csv = new TempCsv "val_str,val_int\n100,10\n200,20"
+        // [修改] 使用更大的数字，避免 Polars 推断为 UInt8
+        // 同时给 val_str 加引号，确保它像个 String
+        use csv = new TempCsv "val_str,val_int\n\"100\",1000\n\"200\",2000"
+        
+        // [修改] 显式指定 Schema，确保 val_str 是 String，val_int 是 Int64
+        // 这样测试的就是纯粹的 Cast 逻辑，而不是 CSV 推断逻辑
+        // (由于 readCsv 还没有 Schema 参数，我们依赖数据本身让推断正确)
+        // 1000 肯定超过了 UInt8 (max 255)，会被推断为 Int64
+        
         let df = Polars.readCsv csv.Path None
 
         let res = 
@@ -268,11 +276,13 @@ type ``String Logic Tests`` () =
             ]
 
         // 验证
+        // "100" -> 100
         let v1 = res.Int("str_to_int", 0).Value
         Assert.Equal(100L, v1)
 
-        let v2 = res.Float("int_to_float", 1).Value
-        Assert.Equal(20.0, v2)
+        // 1000 -> 1000.0
+        let v2 = res.Float("int_to_float", 0).Value
+        Assert.Equal(1000.0, v2)
     [<Fact>]
     member _.``Control Flow: IfElse (When/Then/Otherwise)`` () =
         // 构造成绩数据

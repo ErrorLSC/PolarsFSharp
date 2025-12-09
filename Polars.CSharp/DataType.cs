@@ -1,132 +1,119 @@
+using System;
 using Polars.Native;
 
 namespace Polars.CSharp;
 
 /// <summary>
-/// Data types supported by Polars.
+/// Represents a Polars data type. 
+/// Wraps the underlying Rust DataType.
 /// </summary>
-/// <summary>
-/// Data types supported by Polars.
-/// </summary>
-public enum DataType
+public class DataType : IDisposable
 {
+    internal DataTypeHandle Handle { get; }
+
+    internal DataType(DataTypeHandle handle)
+    {
+        Handle = handle;
+    }
     /// <summary>
-    /// Use the same data type as the input expression (Commonly used for UDFs).
+    /// Dispose the underlying DataTypeHandle.
     /// </summary>
-    SameAsInput,
+    public void Dispose()
+    {
+        Handle.Dispose();
+    }
+
+    // ==========================================
+    // Primitive Factories (Static Properties)
+    // ==========================================
+    
+    // 每次调用都会创建一个新的 Handle，由 SafeHandle 负责释放
+    /// <summary>
+    /// Boolean Data Type
+    /// </summary>
+    public static DataType Boolean => new DataType(PolarsWrapper.NewPrimitiveType((int)PlDataType.Boolean));
+    /// <summary>
+    /// Int8 Data Type
+    /// </summary>
+    public static DataType Int8 => new DataType(PolarsWrapper.NewPrimitiveType((int)PlDataType.Int8));
+    /// <summary>
+    /// Int16 Data Type
+    /// </summary>
+    public static DataType Int16 => new DataType(PolarsWrapper.NewPrimitiveType((int)PlDataType.Int16));
+    /// <summary>
+    /// Int32 Data Type
+    /// </summary>
+    public static DataType Int32 => new DataType(PolarsWrapper.NewPrimitiveType((int)PlDataType.Int32));
+    /// <summary>
+    /// Int64 Data Type
+    /// </summary>
+    public static DataType Int64 => new DataType(PolarsWrapper.NewPrimitiveType((int)PlDataType.Int64));
+    /// <summary>
+    /// UInt8 Data Type
+    /// </summary>
+    public static DataType UInt8 => new DataType(PolarsWrapper.NewPrimitiveType((int)PlDataType.UInt8));
+    /// <summary>
+    /// UInt16 Data Type
+    /// </summary>
+    public static DataType UInt16 => new DataType(PolarsWrapper.NewPrimitiveType((int)PlDataType.UInt16));
+    /// <summary>
+    /// UInt32 Data Type
+    /// </summary>
+    public static DataType UInt32 => new DataType(PolarsWrapper.NewPrimitiveType((int)PlDataType.UInt32));
+    /// <summary>
+    /// UInt64 Data Type
+    /// </summary>
+    public static DataType UInt64 => new DataType(PolarsWrapper.NewPrimitiveType((int)PlDataType.UInt64));
+    /// <summary>
+    /// Float32 Data Type
+    /// </summary>
+    public static DataType Float32 => new DataType(PolarsWrapper.NewPrimitiveType((int)PlDataType.Float32));
+    /// <summary>
+    /// Float64 Data Type
+    /// </summary>
+    public static DataType Float64 => new DataType(PolarsWrapper.NewPrimitiveType((int)PlDataType.Float64));
+    /// <summary>
+    /// String Data Type
+    /// </summary>
+    public static DataType String => new DataType(PolarsWrapper.NewPrimitiveType((int)PlDataType.String));
+    /// <summary>
+    /// Date Data Type
+    /// </summary>
+    public static DataType Date => new DataType(PolarsWrapper.NewPrimitiveType((int)PlDataType.Date));
+    /// <summary>
+    /// Datetime Data Type
+    /// </summary>
+    public static DataType Datetime => new DataType(PolarsWrapper.NewPrimitiveType((int)PlDataType.Datetime));
+    /// <summary>
+    /// Time Data Type
+    /// </summary>
+    public static DataType Time => new DataType(PolarsWrapper.NewPrimitiveType((int)PlDataType.Time));
+    /// <summary>
+    /// Duration Data Type
+    /// </summary>
+    public static DataType Duration => new DataType(PolarsWrapper.NewPrimitiveType((int)PlDataType.Duration));
+    /// <summary>
+    /// Binary Data Type
+    /// </summary>    
+    public static DataType Binary => new DataType(PolarsWrapper.NewPrimitiveType((int)PlDataType.Binary));
+    /// <summary>
+    /// Use the same data type as the input expression (Special type for UDFs).
+    /// </summary>
+    public static DataType SameAsInput => new DataType(PolarsWrapper.NewPrimitiveType((int)PlDataType.SameAsInput));
+
+    // ==========================================
+    // Complex Factories (Methods)
+    // ==========================================
 
     /// <summary>
-    /// Boolean Type
+    /// Create a Decimal data type with specific precision and scale.
     /// </summary>
-    Boolean,
-    
+    public static DataType Decimal(int precision, int scale) 
+        => new DataType(PolarsWrapper.NewDecimalType(precision, scale));
+
     /// <summary>
-    /// Signed 8-bit Integer Type
+    /// Create a Categorical data type.
     /// </summary>
-    Int8,
-    
-    /// <summary>
-    /// Signed 16-bit Integer Type
-    /// </summary>
-    Int16, 
-    
-    /// <summary>
-    /// Signed 32-bit Integer Type
-    /// </summary>
-    Int32, 
-    
-    /// <summary>
-    /// Signed 64-bit Integer Type
-    /// </summary>
-    Int64,
-    
-    /// <summary>
-    /// Unsigned 8-bit Integer Type
-    /// </summary>
-    UInt8, 
-    
-    /// <summary>
-    /// Unsigned 16-bit Integer Type
-    /// </summary>
-    UInt16, 
-    
-    /// <summary>
-    /// Unsigned 32-bit Integer Type
-    /// </summary>
-    UInt32, 
-    
-    /// <summary>
-    /// Unsigned 64-bit Integer Type
-    /// </summary>
-    UInt64,
-    
-    /// <summary>
-    /// 32-bit Floating Point Type
-    /// </summary>
-    Float32, 
-    
-    /// <summary>
-    /// 64-bit Floating Point Type
-    /// </summary>
-    Float64,
-    
-    /// <summary>
-    /// String Types (UTF-8)
-    /// </summary>
-    String,
-    
-    /// <summary>
-    /// Date Type (Days since epoch)
-    /// </summary>
-    Date, 
-    
-    /// <summary>
-    /// DateTime Type (Microseconds since epoch)
-    /// </summary>
-    Datetime, 
-    
-    /// <summary>
-    /// Time Type (Nanoseconds since midnight)
-    /// </summary>
-    Time, 
-    
-    /// <summary>
-    /// Duration Type
-    /// </summary>
-    Duration,
-    
-    /// <summary>
-    /// Binary Type (Bytes)
-    /// </summary>
-    Binary,
-    
-    /// <summary>
-    /// Unknown or Unsupported Type
-    /// </summary>
-    Unknown
-}
-internal static class DataTypeExtensions
-{
-    public static PlDataType ToNative(this DataType dt) => dt switch
-    {
-        DataType.SameAsInput => PlDataType.SameAsInput, // [新增映射]
-        DataType.Boolean => PlDataType.Boolean,
-        DataType.Int8 => PlDataType.Int8,
-        DataType.Int16 => PlDataType.Int16,
-        DataType.Int32 => PlDataType.Int32,
-        DataType.Int64 => PlDataType.Int64,
-        DataType.UInt8 => PlDataType.UInt8,
-        DataType.UInt16 => PlDataType.UInt16,
-        DataType.UInt32 => PlDataType.UInt32,
-        DataType.UInt64 => PlDataType.UInt64,
-        DataType.Float32 => PlDataType.Float32,
-        DataType.Float64 => PlDataType.Float64,
-        DataType.String => PlDataType.String,
-        DataType.Date => PlDataType.Date,
-        DataType.Datetime => PlDataType.Datetime,
-        DataType.Time => PlDataType.Time,
-        DataType.Duration => PlDataType.Duration,
-        DataType.Binary => PlDataType.Binary,
-        _ => PlDataType.Unknown
-    };
+    public static DataType Categorical 
+        => new DataType(PolarsWrapper.NewCategoricalType());
 }
