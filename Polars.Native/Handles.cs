@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
 
 namespace Polars.Native;
 
@@ -68,6 +69,37 @@ public class SqlContextHandle : PolarsHandle
     protected override bool ReleaseHandle()
     {
         NativeBindings.pl_sql_context_free(handle);
+        return true;
+    }
+}
+
+public class SeriesHandle : PolarsHandle
+{
+    // 必须提供无参构造函数给 P/Invoke 使用
+    public SeriesHandle() : base() { }
+
+    protected override bool ReleaseHandle()
+    {
+        // 只有当句柄有效时才释放
+        if (!IsInvalid)
+        {
+            NativeBindings.pl_series_free(handle);
+        }
+        return true;
+    }
+}
+
+// [修复] 继承自 PolarsHandle
+public class ArrowArrayContextHandle : PolarsHandle
+{
+    public ArrowArrayContextHandle() : base() { }
+
+    protected override bool ReleaseHandle()
+    {
+        if (!IsInvalid)
+        {
+            NativeBindings.pl_arrow_array_free(handle);
+        }
         return true;
     }
 }

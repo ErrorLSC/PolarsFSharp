@@ -5,6 +5,7 @@ use crate::types::*;
 use polars::lazy::frame::pivot::pivot as pivot_impl; 
 use polars::lazy::dsl::UnpivotArgsDSL;
 use polars::functions::{concat_df_horizontal,concat_df_diagonal};
+use crate::series::SeriesContext;
 // ==========================================
 // 0. Memory Safety
 // ==========================================
@@ -536,5 +537,63 @@ pub extern "C" fn pl_concat(
         };
 
         Ok(Box::into_raw(Box::new(DataFrameContext { df: out_df })))
+    })
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_dataframe_get_column(
+    ptr: *mut DataFrameContext, 
+    name: *const c_char
+) -> *mut SeriesContext {
+    ffi_try!({  
+        let ctx = unsafe { &*ptr };
+        // [修正] 使用 ptr_to_str 辅助函数
+        let name_str = ptr_to_str(name).unwrap_or("");
+        
+        match ctx.df.column(name_str) {
+            Ok(column) => {
+
+                let s = column.as_materialized_series().clone();
+                
+                Ok(Box::into_raw(Box::new(SeriesContext { series: s })))
+            },
+            Err(_) => Ok(std::ptr::null_mut())
+        }
+    })
+}
+
+// 2. 按索引获取 Series (顺手加的，很常用)
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_dataframe_get_column_at(
+    ptr: *mut DataFrameContext, 
+    index: usize
+) -> *mut SeriesContext {
+    ffi_try!({
+        let ctx = unsafe { &*ptr };
+        
+        // select_at_idx 返回 Option<&Column>
+        match ctx.df.select_at_idx(index) {
+            Some(column) => {
+                // [修正] 同样需要从 Column 提取 Series
+                let s = column.as_materialized_series().clone();
+                Ok(Box::into_raw(Box::new(SeriesContext { series: s })))
+            },
+            None => Ok(std::ptr::null_mut())
+        }
+    })
+}
+
+// 3. 将 Series 转为 DataFrame (方便单列操作后的还原)
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_series_to_frame(ptr: *mut SeriesContext) -> *mut DataFrameContext {
+    ffi_try!({
+        let ctx = unsafe { &*ptr };
+        let s = ctx.series.clone();
+        
+        // [修正] DataFrame::new 接受 Vec<Column>
+        // Series 实现了 Into<Column>
+        let df = DataFrame::new(vec![s.into()]).unwrap_or_default();
+        
+        Ok(Box::into_raw(Box::new(DataFrameContext { df })))
     })
 }

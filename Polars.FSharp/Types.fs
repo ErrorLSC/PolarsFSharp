@@ -335,13 +335,114 @@ type Selector(handle: SelectorHandle) =
 
     member this.ToExpr() =
         new Expr(PolarsWrapper.SelectorToExpr(this.CloneHandle()))
+/// --- Series ---
+/// <summary>
+/// An eager Series holding a single column of data.
+/// </summary>
+type Series(handle: SeriesHandle) =
+    interface IDisposable with member _.Dispose() = handle.Dispose()
+    member _.Handle = handle
+
+    member _.Name = PolarsWrapper.SeriesName handle
+    member _.Length = PolarsWrapper.SeriesLen handle
+    
+    member this.Rename(name: string) = 
+        PolarsWrapper.SeriesRename(handle, name)
+        this
+
+    /// <summary>
+    /// Convert the Series to an Apache Arrow Array.
+    /// This operation involves zero-copy if possible, but may rechunk data internally.
+    /// </summary>
+    member this.ToArrow() : IArrowArray =
+        PolarsWrapper.SeriesToArrow(handle)
+
+    // ==========================================
+    // Static Constructors
+    // ==========================================
+    
+    // --- Int32 ---
+    static member create(name: string, data: int seq) = 
+        new Series(PolarsWrapper.SeriesNew(name, Seq.toArray data, null))
+
+    static member create(name: string, data: int option seq) = 
+        let arr = Seq.toArray data
+        let vals = Array.zeroCreate<int> arr.Length
+        let valid = Array.zeroCreate<bool> arr.Length
+        for i in 0 .. arr.Length - 1 do
+            match arr.[i] with
+            | Some v -> vals.[i] <- v; valid.[i] <- true
+            | None -> vals.[i] <- 0; valid.[i] <- false
+        new Series(PolarsWrapper.SeriesNew(name, vals, valid))
+
+    // --- Int64 ---
+    static member create(name: string, data: int64 seq) = 
+        new Series(PolarsWrapper.SeriesNew(name, Seq.toArray data, null))
+
+    static member create(name: string, data: int64 option seq) = 
+        let arr = Seq.toArray data
+        let vals = Array.zeroCreate<int64> arr.Length
+        let valid = Array.zeroCreate<bool> arr.Length
+        for i in 0 .. arr.Length - 1 do
+            match arr.[i] with
+            | Some v -> vals.[i] <- v; valid.[i] <- true
+            | None -> vals.[i] <- 0L; valid.[i] <- false
+        new Series(PolarsWrapper.SeriesNew(name, vals, valid))
+        
+    // --- Float64 ---
+    static member create(name: string, data: double seq) = 
+        new Series(PolarsWrapper.SeriesNew(name, Seq.toArray data, null))
+
+    static member create(name: string, data: double option seq) = 
+        let arr = Seq.toArray data
+        let vals = Array.zeroCreate<double> arr.Length
+        let valid = Array.zeroCreate<bool> arr.Length
+        for i in 0 .. arr.Length - 1 do
+            match arr.[i] with
+            | Some v -> vals.[i] <- v; valid.[i] <- true
+            | None -> vals.[i] <- Double.NaN; valid.[i] <- false
+        new Series(PolarsWrapper.SeriesNew(name, vals, valid))
+
+    // --- Boolean ---
+    static member create(name: string, data: bool seq) = 
+        new Series(PolarsWrapper.SeriesNew(name, Seq.toArray data, null))
+
+    static member create(name: string, data: bool option seq) = 
+        let arr = Seq.toArray data
+        let vals = Array.zeroCreate<bool> arr.Length
+        let valid = Array.zeroCreate<bool> arr.Length
+        for i in 0 .. arr.Length - 1 do
+            match arr.[i] with
+            | Some v -> vals.[i] <- v; valid.[i] <- true
+            | None -> vals.[i] <- false; valid.[i] <- false
+        new Series(PolarsWrapper.SeriesNew(name, vals, valid))
+
+    // --- String ---
+    static member create(name: string, data: string seq) = 
+        // 这里的 string seq 本身可能包含 null (如果源是 C#), 或者 F# string (不可空)
+        // 为了安全，我们转为 string[] 即可
+        new Series(PolarsWrapper.SeriesNew(name, Seq.toArray data))
+
+    static member create(name: string, data: string option seq) = 
+        let arr = Seq.toArray data
+        // 将 Option 转换为 string array (None -> null)
+        let vals = arr |> Array.map (fun opt -> match opt with Some s -> s | None -> null)
+        new Series(PolarsWrapper.SeriesNew(name, vals))
+
+    // ==========================================
+    // Interop with DataFrame
+    // ==========================================
+    
+    member this.ToFrame() : DataFrame =
+        let h = PolarsWrapper.SeriesToFrame handle
+        new DataFrame(h)
 
 // --- Frames ---
 
 /// <summary>
 /// An eager DataFrame holding data in memory.
 /// </summary>
-type DataFrame(handle: DataFrameHandle) =
+and DataFrame(handle: DataFrameHandle) =
     interface IDisposable with
         member _.Dispose() = handle.Dispose()
     member this.Clone() = new DataFrame(PolarsWrapper.CloneDataFrame handle)
@@ -372,9 +473,9 @@ type DataFrame(handle: DataFrameHandle) =
         let extractStrings (valuesArr: IArrowArray) (startIdx: int) (endIdx: int) =
             match valuesArr with
             | :? StringArray as sa ->
-                [ for i in startIdx .. endIdx - 1 -> sa.GetString(i) ]
+                [ for i in startIdx .. endIdx - 1 -> sa.GetString i ]
             | :? StringViewArray as sva ->
-                [ for i in startIdx .. endIdx - 1 -> sva.GetString(i) ]
+                [ for i in startIdx .. endIdx - 1 -> sva.GetString i ]
             | _ -> [] 
 
         match col with
@@ -398,6 +499,22 @@ type DataFrame(handle: DataFrameHandle) =
         | _ -> 
             // System.Console.WriteLine($"[Debug] Mismatched Array Type: {col.GetType().Name}")
             None
+    member this.Column(name: string) : Series =
+    // 我们假设 Rust 端有 pl_dataframe_get_column
+        let h = PolarsWrapper.DataFrameGetColumn(this.Handle, name)
+        new Series(h)
+    member this.Column(index: int) : Series =
+        let h = PolarsWrapper.DataFrameGetColumnAt(this.Handle, index)
+        new Series(h)
+        
+    member this.Item 
+        with get(name: string) = this.Column name
+    
+    member this.Item 
+        with get(index: int) = this.Column index
+
+    member this.GetSeries() : Series list =
+        [ for i in 0 .. int this.Columns - 1 -> this.Column i ]
 
 /// <summary>
 /// A LazyFrame represents a logical plan of operations that will be optimized and executed only when collected.

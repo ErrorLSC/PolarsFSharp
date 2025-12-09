@@ -18,6 +18,7 @@
     <Compile Include="ComplexTests.fs" />
     <Compile Include="SafetyTests.fs" />
     <Compile Include="UDFTests.fs" />
+    <Compile Include="SeriesTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

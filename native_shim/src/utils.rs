@@ -62,3 +62,12 @@ pub extern "C" fn pl_arrow_schema_export(
         std::ptr::write(out_c_schema as *mut _, rust_arrow_schema);
     }
 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_free_c_string(c_str: *mut std::os::raw::c_char) {
+    if !c_str.is_null() {
+        unsafe {
+            let _ = std::ffi::CString::from_raw(c_str);
+        }
+    }
+}

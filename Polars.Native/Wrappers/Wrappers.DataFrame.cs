@@ -171,4 +171,25 @@ public static partial class PolarsWrapper
 
         return ErrorHelper.Check(h);
     }
+    public static SeriesHandle DataFrameGetColumn(DataFrameHandle h, string name)
+    {
+        var sh = NativeBindings.pl_dataframe_get_column(h, name);
+        if (sh.IsInvalid)
+        {
+            // 这里抛异常比较好，F# 层可以 try-catch 或者我们提供 TryGetColumn
+            throw new ArgumentException($"Column '{name}' not found in DataFrame.");
+        }
+        return sh;
+    }
+
+    // 按索引获取
+    public static SeriesHandle DataFrameGetColumnAt(DataFrameHandle h, int index)
+    {
+        var sh = NativeBindings.pl_dataframe_get_column_at(h, (UIntPtr)index);
+        if (sh.IsInvalid)
+        {
+            throw new IndexOutOfRangeException($"Column index {index} is out of bounds.");
+        }
+        return sh;
+    }
 }

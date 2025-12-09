@@ -416,4 +416,64 @@ unsafe internal partial class NativeBindings
     [LibraryImport(LibName,StringMarshalling = StringMarshalling.Utf8)] public static partial ExprHandle pl_expr_rolling_min_by(ExprHandle expr, string windowSize, ExprHandle by, string closed);
     [LibraryImport(LibName,StringMarshalling = StringMarshalling.Utf8)] public static partial ExprHandle pl_expr_rolling_max_by(ExprHandle expr, string windowSize, ExprHandle by, string closed);
     [LibraryImport(LibName)] public static partial ExprHandle pl_expr_if_else(ExprHandle pred, ExprHandle ifTrue, ExprHandle ifFalse);
+    // --- Series Lifecycle ---
+    [LibraryImport(LibName)]
+    public static partial void pl_series_free(IntPtr ptr);
+    [LibraryImport(LibName)]
+    public static partial void pl_free_c_string(IntPtr ptr);
+    [LibraryImport(LibName)]
+    public static partial void pl_arrow_array_free(IntPtr ptr);
+    // --- Series Constructors ---
+    // DataFrame -> Series (ByName)
+    [LibraryImport(LibName, StringMarshalling = StringMarshalling.Utf8)]
+    public static partial SeriesHandle pl_dataframe_get_column(DataFrameHandle df, string name);
+    // DataFrame -> Series (ByIndex)
+    [LibraryImport(LibName)]
+    public static partial SeriesHandle pl_dataframe_get_column_at(DataFrameHandle df, UIntPtr index);
+    // Series -> DataFrame
+    [LibraryImport(LibName)]
+    public static partial DataFrameHandle pl_series_to_frame(SeriesHandle s);
+    // 数值类型：支持 validity 位图
+    [LibraryImport(LibName, StringMarshalling = StringMarshalling.Utf8)]
+    public static partial SeriesHandle pl_series_new_i32(string name, int[] ptr, byte[]? validity, UIntPtr len);
+
+    [LibraryImport(LibName, StringMarshalling = StringMarshalling.Utf8)]
+    public static partial SeriesHandle pl_series_new_i64(string name, long[] ptr, byte[]? validity, UIntPtr len);
+
+    [LibraryImport(LibName, StringMarshalling = StringMarshalling.Utf8)]
+    public static partial SeriesHandle pl_series_new_f64(string name, double[] ptr, byte[]? validity, UIntPtr len);
+
+    [LibraryImport(LibName, StringMarshalling = StringMarshalling.Utf8)]
+    public static partial SeriesHandle pl_series_new_bool(
+        string name, 
+        byte[] ptr, 
+        byte[]? validity, 
+        UIntPtr len
+    );
+
+    // 字符串类型：IntPtr[] 里的 IntPtr.Zero 代表 null
+    [LibraryImport(LibName, StringMarshalling = StringMarshalling.Utf8)]
+    public static partial SeriesHandle pl_series_new_str(string name, IntPtr[] strs, UIntPtr len);
+
+    // --- Series Properties ---
+    [LibraryImport(LibName)]
+    public static partial UIntPtr pl_series_len(SeriesHandle h);
+
+    [LibraryImport(LibName)]
+    public static partial IntPtr pl_series_name(SeriesHandle h);
+
+    [LibraryImport(LibName, StringMarshalling = StringMarshalling.Utf8)]
+    public static partial void pl_series_rename(SeriesHandle h, string name);
+
+    // --- Arrow Export ---
+    [LibraryImport(LibName)]
+    public static partial ArrowArrayContextHandle pl_series_to_arrow(SeriesHandle h);
+
+    [LibraryImport(LibName)]
+    public static partial void pl_arrow_array_export(ArrowArrayContextHandle ptr, void* out_c_array);
+
+    [LibraryImport(LibName)]
+    public static partial void pl_arrow_schema_export(ArrowArrayContextHandle ptr, void* out_c_schema);
+
+    
 }
