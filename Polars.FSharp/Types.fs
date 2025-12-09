@@ -15,29 +15,36 @@ type DataType =
     | Date | Datetime | Time
     | Duration
     | Binary
+    | Categorical
+    | Decimal of precision: int option * scale: int
     | Unknown
 
     // 转换 helper
-    member internal this.ToNative() =
+    member internal this.CreateHandle() =
         match this with
-        | Boolean -> PlDataType.Boolean
-        | Int8 -> PlDataType.Int8
-        | Int16 -> PlDataType.Int16
-        | Int32 -> PlDataType.Int32
-        | Int64 -> PlDataType.Int64
-        | UInt8 -> PlDataType.UInt8
-        | UInt16 -> PlDataType.UInt16
-        | UInt32 -> PlDataType.UInt32
-        | UInt64 -> PlDataType.UInt64
-        | Float32 -> PlDataType.Float32
-        | Float64 -> PlDataType.Float64
-        | String -> PlDataType.String
-        | Date -> PlDataType.Date
-        | Datetime -> PlDataType.Datetime
-        | Time -> PlDataType.Time
-        | Duration -> PlDataType.Duration
-        | Binary -> PlDataType.Binary
-        | Unknown -> PlDataType.Unknown
+        | Boolean -> PolarsWrapper.NewPrimitiveType 0
+        | Int8 -> PolarsWrapper.NewPrimitiveType 1
+        | Int16 -> PolarsWrapper.NewPrimitiveType 2
+        | Int32 -> PolarsWrapper.NewPrimitiveType 3
+        | Int64 -> PolarsWrapper.NewPrimitiveType 4
+        | UInt8 -> PolarsWrapper.NewPrimitiveType 5
+        | UInt16 -> PolarsWrapper.NewPrimitiveType 6
+        | UInt32 -> PolarsWrapper.NewPrimitiveType 7
+        | UInt64 -> PolarsWrapper.NewPrimitiveType 8
+        | Float32 -> PolarsWrapper.NewPrimitiveType 9
+        | Float64 -> PolarsWrapper.NewPrimitiveType 10
+        | String -> PolarsWrapper.NewPrimitiveType 11
+        | Date -> PolarsWrapper.NewPrimitiveType 12
+        | Datetime -> PolarsWrapper.NewPrimitiveType 13
+        | Time -> PolarsWrapper.NewPrimitiveType 14
+        | Duration -> PolarsWrapper.NewPrimitiveType 15
+        | Binary -> PolarsWrapper.NewPrimitiveType 16
+        | Unknown -> PolarsWrapper.NewPrimitiveType -1
+        | Categorical -> PolarsWrapper.NewCategoricalType()
+        | Decimal (p, s) -> 
+            let prec = defaultArg p 0 // 0 means None in Rust shim
+            PolarsWrapper.NewDecimalType(prec, s)
+
 /// <summary>
 /// Represents the type of join operation to perform.
 /// </summary>
@@ -132,7 +139,15 @@ type Expr(handle: ExprHandle) =
     /// <summary> Cast the expression to a different data type. </summary>
     member this.Cast(dtype: DataType, ?strict: bool) =
         let isStrict = defaultArg strict false
-        new Expr(PolarsWrapper.Cast(this.CloneHandle(), dtype.ToNative(), isStrict))
+        
+        // 1. 创建 Type Handle
+        use typeHandle = dtype.CreateHandle()
+        
+        // 2. 调用更新后的 Wrapper
+        // 注意：CloneHandle 是必须的，因为 Expr 是不可变的，操作产生新 Expr
+        let newHandle = PolarsWrapper.ExprCast(this.CloneHandle(), typeHandle, isStrict)
+        
+        new Expr(newHandle)
     // Aggregations
     member this.Sum() = new Expr(PolarsWrapper.Sum handle)
     member this.Mean() = new Expr(PolarsWrapper.Mean handle)
@@ -436,6 +451,11 @@ type Series(handle: SeriesHandle) =
     member this.ToFrame() : DataFrame =
         let h = PolarsWrapper.SeriesToFrame handle
         new DataFrame(h)
+
+    member this.Cast(dtype: DataType) : Series =
+        use typeHandle = dtype.CreateHandle()
+        let newHandle = PolarsWrapper.SeriesCast(handle, typeHandle)
+        new Series(newHandle)
 
 // --- Frames ---
 

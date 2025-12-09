@@ -121,4 +121,13 @@ public static partial class PolarsWrapper
             // 只需要释放 Rust 的 Context 壳子 (由 using contextHandle 自动完成)
         }
     }
+    public static SeriesHandle SeriesCast(SeriesHandle s, DataTypeHandle dtype)
+    {
+        return ErrorHelper.Check(NativeBindings.pl_series_cast(s, dtype));
+    }
+
+    // DataType Helpers
+    public static DataTypeHandle NewPrimitiveType(int code) => NativeBindings.pl_datatype_new_primitive(code);
+    public static DataTypeHandle NewDecimalType(int precision, int scale) => NativeBindings.pl_datatype_new_decimal((UIntPtr)precision, (UIntPtr)scale);
+    public static DataTypeHandle NewCategoricalType() => NativeBindings.pl_datatype_new_categorical();
 }

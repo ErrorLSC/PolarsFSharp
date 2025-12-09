@@ -19,7 +19,7 @@ type ``Series Tests`` () =
         let arrow = s.ToArrow() :?> Int32Array
         Assert.Equal(4, arrow.Length)
         Assert.Equal(1, arrow.GetValue(0).Value)
-        Assert.True(arrow.IsNull(1)) // Null Check
+        Assert.True(arrow.IsNull 1) // Null Check
         Assert.Equal(3, arrow.GetValue(2).Value)
 
     [<Fact>]
@@ -32,12 +32,12 @@ type ``Series Tests`` () =
         // 这里做个类型匹配
         match arrow with
         | :? StringViewArray as sa ->
-            Assert.Equal("hello", sa.GetString(0))
-            Assert.True(sa.IsNull(1))
-            Assert.Equal("world", sa.GetString(2))
+            Assert.Equal("hello", sa.GetString 0)
+            Assert.True(sa.IsNull 1)
+            Assert.Equal("world", sa.GetString 2)
         | :? StringArray as sa -> // Fallback logic
-            Assert.Equal("hello", sa.GetString(0))
-            Assert.True(sa.IsNull(1))
+            Assert.Equal("hello", sa.GetString 0)
+            Assert.True(sa.IsNull 1)
         | _ -> failwithf "Unexpected arrow type: %s" (arrow.GetType().Name)
 
     [<Fact>]
@@ -60,11 +60,11 @@ type ``Series Tests`` () =
     [<Fact>]
     member _.``Interop: DataFrame <-> Series`` () =
         // 1. 创建 DataFrame
-        use csv = new TempCsv("name,age\nalice,10\nbob,20")
+        use csv = new TempCsv "name,age\nalice,10\nbob,20"
         let df = Polars.readCsv csv.Path None
         
         // 2. 获取 Series (ByName)
-        use sName = df.Column("name")
+        use sName = df.Column "name"
         Assert.Equal("name", sName.Name)
         Assert.Equal(2L, sName.Length)
 
@@ -81,3 +81,51 @@ type ``Series Tests`` () =
         Assert.Equal(1L, dfNew.Columns)
         Assert.Equal(2L, dfNew.Rows)
         Assert.Equal("age", dfNew.ColumnNames.[0])
+    [<Fact>]
+    member _.``Series: Cast to Categorical`` () =
+        // 1. 创建字符串 Series (高重复)
+        let data = ["apple"; "banana"; "apple"; "apple"; "banana"]
+        use s = Series.create("fruits", data)
+        
+        // 2. 转换为 Categorical
+        use sCat = s.Cast DataType.Categorical
+        
+        // 3. 验证 Arrow 类型
+        let arrow = sCat.ToArrow()
+        
+        // [修复] 使用 DictionaryArray 基类
+        Assert.IsAssignableFrom<Apache.Arrow.DictionaryArray> arrow |> ignore
+        
+        // 进一步验证内部结构
+        let dictArr = arrow :?> Apache.Arrow.DictionaryArray
+        
+        // 验证索引类型 (Polars 通常使用 UInt32 作为物理索引)
+        // 注意：Indices 也是一个 IArrowArray
+        let indices = dictArr.Indices
+        Assert.IsAssignableFrom<Apache.Arrow.UInt32Array> indices |> ignore
+        
+        // 验证字典值 (应该是去重后的字符串)
+        let values = dictArr.Dictionary
+        // 可能是 StringArray 或 StringViewArray (取决于 Polars 兼容性设置)
+        Assert.True(values :? Apache.Arrow.StringArray || values :? Apache.Arrow.StringViewArray)
+        
+        // 验证值内容 (apple, banana)
+        Assert.Equal(2, values.Length)
+
+    [<Fact>]
+    member _.``Series: Cast to Decimal (From String)`` () =
+        // 1. 使用字符串源数据，保证精度
+        let data = ["1.23"; "4.56"; "7.89"]
+        use s = Series.create("money", data)
+        
+        // 2. String -> Decimal (Precision=10, Scale=2)
+        // Polars 解析字符串 "4.56" -> 456 (int128) -> 正确
+        use sDec = s.Cast(Decimal(Some 10, 2))
+        
+        // 3. 验证
+        let arrow = sDec.ToArrow()
+        let decArr = arrow :?> Decimal128Array
+        
+        Assert.Equal(1.23m, decArr.GetValue(0).Value)
+        Assert.Equal(4.56m, decArr.GetValue(1).Value) // 完美通过
+        Assert.Equal(7.89m, decArr.GetValue(2).Value)

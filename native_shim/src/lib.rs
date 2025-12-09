@@ -10,6 +10,7 @@ mod udf;
 mod selectors;
 mod sql;
 mod series;
+mod datatypes;
 
 
 

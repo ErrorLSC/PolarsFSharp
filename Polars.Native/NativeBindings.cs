@@ -165,11 +165,7 @@ unsafe internal partial class NativeBindings
         IntPtr userData          
     );
     [LibraryImport(LibName)] 
-    public static partial ExprHandle pl_expr_cast(
-        ExprHandle expr, 
-        PlDataType dtype, 
-        [MarshalAs(UnmanagedType.U1)] bool strict
-    );
+    public static partial ExprHandle pl_expr_cast(ExprHandle expr, DataTypeHandle dtype, [MarshalAs(UnmanagedType.U1)] bool strict);
     [LibraryImport(LibName)]
     public static partial DataFrameHandle pl_groupby_agg(
         DataFrameHandle df, 
@@ -465,6 +461,10 @@ unsafe internal partial class NativeBindings
     [LibraryImport(LibName, StringMarshalling = StringMarshalling.Utf8)]
     public static partial void pl_series_rename(SeriesHandle h, string name);
 
+    // --- Series Cast ---
+    [LibraryImport(LibName)]
+    public static partial SeriesHandle pl_series_cast(SeriesHandle s, DataTypeHandle dtype);
+
     // --- Arrow Export ---
     [LibraryImport(LibName)]
     public static partial ArrowArrayContextHandle pl_series_to_arrow(SeriesHandle h);
@@ -475,5 +475,18 @@ unsafe internal partial class NativeBindings
     [LibraryImport(LibName)]
     public static partial void pl_arrow_schema_export(ArrowArrayContextHandle ptr, void* out_c_schema);
 
-    
+    // --- DataType ---
+    [LibraryImport(LibName)]
+    public static partial void pl_datatype_free(IntPtr ptr);
+
+    [LibraryImport(LibName)]
+    public static partial DataTypeHandle pl_datatype_new_primitive(int code);
+
+    [LibraryImport(LibName)]
+    public static partial DataTypeHandle pl_datatype_new_decimal(UIntPtr precision, UIntPtr scale);
+
+    [LibraryImport(LibName)]
+    public static partial DataTypeHandle pl_datatype_new_categorical();
+
+
 }

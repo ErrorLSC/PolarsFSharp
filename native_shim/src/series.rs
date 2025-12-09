@@ -2,7 +2,7 @@ use polars::prelude::*;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use crate::utils::*;
-
+use crate::datatypes::DataTypeContext;
 // 包装结构体
 pub struct SeriesContext {
     pub series: Series,
@@ -176,4 +176,20 @@ pub extern "C" fn pl_series_to_arrow(ptr: *mut SeriesContext) -> *mut ArrowArray
     let arr = contiguous_series.to_arrow(0, CompatLevel::newest());
     
     Box::into_raw(Box::new(ArrowArrayContext { array: arr }))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_series_cast(
+    ptr: *mut SeriesContext, 
+    dtype_ptr: *mut DataTypeContext
+) -> *mut SeriesContext {
+    let ctx = unsafe { &*ptr };
+    let target_dtype = unsafe { &(*dtype_ptr).dtype };
+    
+    // 使用 cast (NonStrict 模式，转换失败返回 Null)
+    // 如果需要 Strict 模式，可以加参数控制
+    match ctx.series.cast(target_dtype) {
+        Ok(s) => Box::into_raw(Box::new(SeriesContext { series: s })),
+        Err(_) => std::ptr::null_mut()
+    }
 }

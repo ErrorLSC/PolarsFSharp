@@ -103,3 +103,13 @@ public class ArrowArrayContextHandle : PolarsHandle
         return true;
     }
 }
+
+public class DataTypeHandle : PolarsHandle
+{
+    public DataTypeHandle() : base() { }
+    protected override bool ReleaseHandle()
+    {
+        NativeBindings.pl_datatype_free(handle);
+        return true;
+    }
+}
