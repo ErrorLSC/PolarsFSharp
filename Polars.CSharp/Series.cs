@@ -20,7 +20,14 @@ public class Series : IDisposable
         PolarsWrapper.SeriesRename(handle, name);
         Handle = handle;
     }
+    // ==========================================
+    // Metadata
+    // ==========================================
 
+    /// <summary>
+    /// Get the string representation of the Series data type (e.g. "i64", "str", "datetime(μs)").
+    /// </summary>
+    public string DataTypeName => PolarsWrapper.GetSeriesDtypeString(Handle);
     // ==========================================
     // Constructors
     // ==========================================
@@ -198,7 +205,29 @@ public class Series : IDisposable
         }
         throw new NotSupportedException($"Type {type.Name} is not supported for Series creation via Create<T>.");
     }
+    /// <summary>
+    /// Create a Series from an array of decimals.
+    /// </summary>
+    /// <param name="name"></param>
+    /// <param name="data"></param>
+    /// <param name="validity"></param>
+    public Series(string name, decimal[] data, bool[]? validity = null)
+    {
+        // 复用之前的自动精度推断逻辑
+        int scale = DetectMaxScale(data);
+        Handle = PolarsWrapper.SeriesNewDecimal(name, data, validity, scale);
+    }
 
+    /// <summary>
+    /// Create a Series from an array of nullable decimals.
+    /// </summary>
+    /// <param name="name"></param>
+    /// <param name="data"></param>
+    public Series(string name, decimal?[] data)
+    {
+        int scale = DetectMaxScale(data);
+        Handle = PolarsWrapper.SeriesNewDecimal(name, data, scale);
+    }
     // ==========================================
     // Internal Helpers
     // ==========================================

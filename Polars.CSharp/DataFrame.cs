@@ -1,6 +1,7 @@
 using Polars.Native;
 using Apache.Arrow;
 using System.Reflection;
+using System.Text.Json;
 namespace Polars.CSharp;
 
 /// <summary>
@@ -13,6 +14,58 @@ public class DataFrame : IDisposable
     internal DataFrame(DataFrameHandle handle)
     {
         Handle = handle;
+    }
+    // ==========================================
+    // Metadata
+    // ==========================================
+
+    /// <summary>
+    /// Get the schema of the DataFrame as a dictionary (Column Name -> Data Type String).
+    /// </summary>
+    public Dictionary<string, string> Schema
+    {
+        get
+        {
+            var json = PolarsWrapper.GetDataFrameSchemaString(Handle);
+            if (string.IsNullOrEmpty(json) || json == "{}")
+            {
+                return [];
+            }
+
+            try 
+            {
+                return JsonSerializer.Deserialize<Dictionary<string, string>>(json) 
+                       ?? [];
+            }
+            catch
+            {
+                // 容错：如果 JSON 解析失败，返回空字典
+                return [];
+            }
+        }
+    }
+    /// <summary>
+    /// Prints the schema to the console in a tree format.
+    /// Useful for debugging column names and data types.
+    /// </summary>
+    public void PrintSchema()
+    {
+        var schema = this.Schema; // 获取刚刚实现的 Dictionary
+        
+        System.Console.WriteLine("root");
+        foreach (var kvp in schema)
+        {
+            // 格式模仿 Spark:  |-- name: type
+            System.Console.WriteLine($" |-- {kvp.Key}: {kvp.Value}");
+        }
+    }
+    /// <summary>
+    /// Get a string representation of the DataFrame schema.
+    /// </summary>
+    /// <returns></returns>
+    public override string ToString()
+    {
+        return $"DataFrame: {Height}x{Width} {string.Join(", ", Schema.Select(kv => $"{kv.Key}:{kv.Value}"))}";
     }
     // ==========================================
     // Static IO Read
@@ -99,14 +152,6 @@ public class DataFrame : IDisposable
     /// Return DataFrame Columns' Name
     /// </summary>
     public string[] Columns => PolarsWrapper.GetColumnNames(Handle); //
-    /// <summary>
-    /// Output DataFrame structure to string
-    /// </summary>
-    /// <returns></returns>
-    public override string ToString()
-    {
-        return $"DataFrame: {Height}x{Width} [{string.Join(", ", Columns)}]";
-    }
 
     // ==========================================
     // DataFrame Operations
