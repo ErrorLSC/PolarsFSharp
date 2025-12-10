@@ -218,4 +218,15 @@ public static partial class PolarsWrapper
         // 注意：ptrs 数组会被 Pin 住传给 Rust
         return ErrorHelper.Check(NativeBindings.pl_dataframe_new(ptrs, (UIntPtr)series.Length));
     }
+    /// <summary>
+    /// Convert DataFrame to LazyFrame
+    /// </summary>
+    /// <param name="df"></param>
+    /// <returns></returns>
+    public static LazyFrameHandle DataFrameToLazy(DataFrameHandle df)
+    {
+        // 调用 Rust，返回一个新的 LazyFrameHandle
+        // 原来的 df 不会被 Dispose (因为 Rust 端做了 clone)
+        return ErrorHelper.Check(NativeBindings.pl_dataframe_lazy(df));
+    }
 }

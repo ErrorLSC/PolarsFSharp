@@ -647,3 +647,14 @@ pub extern "C" fn pl_dataframe_new(
         Ok(Box::into_raw(Box::new(DataFrameContext { df })))
     })
 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_dataframe_lazy(df_ptr: *mut DataFrameContext) -> *mut LazyFrameContext {
+    let ctx = unsafe { &*df_ptr };
+    // [关键] 我们 Clone 一份 DataFrame 再转 Lazy。
+    // 这样原来的 DataFrameHandle 在 C# 端依然有效，符合 .NET 的引用语义。
+    // Polars 的 DF Clone 是浅拷贝 (Arc)，开销很小。
+    let inner = ctx.df.clone().lazy();
+    
+    Box::into_raw(Box::new(LazyFrameContext { inner }))
+}

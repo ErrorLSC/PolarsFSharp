@@ -318,4 +318,35 @@ HR,50";
         Assert.Equal("10:05", timeCol.GetStringValue(2));
         Assert.Equal(151, bidCol.GetInt64Value(2));
     }
+    [Fact]
+    public void Test_DataFrame_To_Lazy_And_Sql()
+    {
+        // 1. Eager DataFrame
+        var data = new[]
+        {
+            new { Name = "A", Val = 10 },
+            new { Name = "B", Val = 20 }
+        };
+        using var df = DataFrame.From(data);
+
+        // 2. 转 Lazy (新功能)
+        using var lf = df.Lazy();
+
+        // 3. 验证 Lazy 操作
+        using var resDf = lf
+            .Filter(Col("Val") > Lit(15))
+            .Collect();
+
+        Assert.Equal(1, resDf.Height); // Only B
+
+        // 4. 验证原 DF 是否还活着 (关键！如果 Lazy() 没 Clone，这里会崩)
+        Assert.Equal(2, df.Height); 
+
+        // 5. 验证 SQL Context (CloneHandle 修复验证)
+        using var ctx = new SqlContext();
+        ctx.Register("mytable", lf); // 这里调用了 lf.CloneHandle()
+        
+        using var sqlRes = ctx.Execute("SELECT * FROM mytable WHERE Val < 15").Collect();
+        Assert.Equal(1, sqlRes.Height); // Only A
+    }
 }

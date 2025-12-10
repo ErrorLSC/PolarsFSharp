@@ -91,7 +91,10 @@ public class LazyFrame : IDisposable
         //
         return new LazyFrame(PolarsWrapper.LazyClone(Handle));
     }
-
+    internal LazyFrameHandle CloneHandle()
+    {
+        return PolarsWrapper.LazyClone(Handle);
+    }
     // ==========================================
     // Transformations
     // ==========================================
@@ -102,9 +105,10 @@ public class LazyFrame : IDisposable
     /// <returns></returns>
     public LazyFrame Select(params Expr[] exprs)
     {
+        var lfClone = this.CloneHandle();
         var handles = exprs.Select(e => PolarsWrapper.CloneExpr(e.Handle)).ToArray();
         // LazySelect 会消耗当前的 Handle
-        return new LazyFrame(PolarsWrapper.LazySelect(Handle, handles));
+        return new LazyFrame(PolarsWrapper.LazySelect(lfClone, handles));
     }
     /// <summary>
     /// Filter rows based on a boolean expression.
@@ -113,9 +117,10 @@ public class LazyFrame : IDisposable
     /// <returns></returns>
     public LazyFrame Filter(Expr expr)
     {
+        var lfClone = this.CloneHandle();
         var h = PolarsWrapper.CloneExpr(expr.Handle);
         //
-        return new LazyFrame(PolarsWrapper.LazyFilter(Handle, h));
+        return new LazyFrame(PolarsWrapper.LazyFilter(lfClone, h));
     }
     /// <summary>
     /// Add or modify columns based on expressions.
@@ -124,9 +129,10 @@ public class LazyFrame : IDisposable
     /// <returns></returns>
     public LazyFrame WithColumns(params Expr[] exprs)
     {
+        var lfClone = this.CloneHandle();
         var handles = exprs.Select(e => PolarsWrapper.CloneExpr(e.Handle)).ToArray();
         //
-        return new LazyFrame(PolarsWrapper.LazyWithColumns(Handle, handles));
+        return new LazyFrame(PolarsWrapper.LazyWithColumns(lfClone, handles));
     }
     /// <summary>
     /// Sort the DataFrame by an expression.
@@ -136,9 +142,10 @@ public class LazyFrame : IDisposable
     /// <returns></returns>
     public LazyFrame Sort(Expr by, bool descending = false)
     {
+        var lfClone = this.CloneHandle();
         var h = PolarsWrapper.CloneExpr(by.Handle);
         //
-        return new LazyFrame(PolarsWrapper.LazySort(Handle, h, descending));
+        return new LazyFrame(PolarsWrapper.LazySort(lfClone, h, descending));
     }
     /// <summary>
     /// Limit the number of rows in the LazyFrame.
@@ -147,8 +154,8 @@ public class LazyFrame : IDisposable
     /// <returns></returns>
     public LazyFrame Limit(uint n)
     {
-        //
-        return new LazyFrame(PolarsWrapper.LazyLimit(Handle, n));
+        var lfClone = this.CloneHandle();
+        return new LazyFrame(PolarsWrapper.LazyLimit(lfClone, n));
     }
     /// <summary>
     /// Explode list-like columns into multiple rows.
@@ -157,9 +164,10 @@ public class LazyFrame : IDisposable
     /// <returns></returns>
     public LazyFrame Explode(params Expr[] exprs)
     {
+        var lfClone = this.CloneHandle();
         var handles = exprs.Select(e => PolarsWrapper.CloneExpr(e.Handle)).ToArray();
         //
-        return new LazyFrame(PolarsWrapper.LazyExplode(Handle, handles));
+        return new LazyFrame(PolarsWrapper.LazyExplode(lfClone, handles));
     }
 
     // ==========================================
@@ -175,8 +183,8 @@ public class LazyFrame : IDisposable
     /// <returns></returns>
     public LazyFrame Unpivot(string[] index, string[] on, string variableName = "variable", string valueName = "value")
     {
-        //
-        return new LazyFrame(PolarsWrapper.LazyUnpivot(Handle, index, on, variableName, valueName));
+        var lfClone = this.CloneHandle();
+        return new LazyFrame(PolarsWrapper.LazyUnpivot(lfClone, index, on, variableName, valueName));
     }
     /// <summary>
     /// Melt the DataFrame from wide to long format.
@@ -202,7 +210,8 @@ public class LazyFrame : IDisposable
         bool rechunk = false, 
         bool parallel = true)
     {
-        var handles = lfs.Select(l => PolarsWrapper.LazyClone(l.Handle)).ToArray();
+        var lfClones = lfs.Select(l => l.CloneHandle()).ToArray();
+        var handles = lfClones.Select(l => l).ToArray();
         return new LazyFrame(PolarsWrapper.LazyConcat(handles, how.ToNative(), rechunk, parallel));
     }
 
@@ -221,11 +230,12 @@ public class LazyFrame : IDisposable
     {
         var lOn = leftOn.Select(e => PolarsWrapper.CloneExpr(e.Handle)).ToArray();
         var rOn = rightOn.Select(e => PolarsWrapper.CloneExpr(e.Handle)).ToArray();
-
+        var lfClone = this.CloneHandle();
+        var otherClone = other.CloneHandle();
         // Join 消耗 left(this) 和 right(other)
         return new LazyFrame(PolarsWrapper.Join(
-            this.Handle, 
-            other.Handle, 
+            lfClone, 
+            otherClone, 
             lOn, 
             rOn, 
             how.ToNative()
@@ -255,6 +265,8 @@ public class LazyFrame : IDisposable
         Expr[]? leftBy = null,
         Expr[]? rightBy = null)
     {
+        var lfClone = this.CloneHandle();
+        var otherClone = other.CloneHandle();
         var lOn = PolarsWrapper.CloneExpr(leftOn.Handle);
         var rOn = PolarsWrapper.CloneExpr(rightOn.Handle);
         
@@ -263,7 +275,7 @@ public class LazyFrame : IDisposable
 
         //
         return new LazyFrame(PolarsWrapper.JoinAsOf(
-            this.Handle, other.Handle,
+            lfClone, otherClone,
             lOn, rOn,
             lBy, rBy,
             strategy, tolerance

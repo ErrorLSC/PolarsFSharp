@@ -229,6 +229,26 @@ type ``Basic Functionality Tests`` () =
         // 5. 打印看看
         Polars.show df |> ignore
     [<Fact>]
+    member _.``Conversion: DataFrame -> Lazy -> DataFrame`` () =
+        // 1. 创建 Eager DF
+        use df = DataFrame.ofRecords [ { name = "Qinglei"; age = 18 ; score = Some 99.5; joined = Some (System.DateTime(2023,1,1)) }; { name = "Someone"; age = 20; score = None; joined = None } ]
+        
+        // 2. 转 Lazy 并执行操作
+        // 注意：df 在这里应该依然有效，因为 .Lazy() 是 Clone
+        let lf = df.Lazy()
+        
+        let res = 
+            lf
+            |> Polars.filterLazy(Polars.col "age" .> Polars.lit 18)
+            |> Polars.collect
+
+        // 3. 验证结果
+        Assert.Equal(1L, res.Rows)
+        Assert.Equal(20L, res.Int("age", 0).Value)
+        
+        // 4. 验证原 DF 依然存活
+        Assert.Equal(2L, df.Rows)
+    [<Fact>]
     member _.``Reshaping: Concat Diagonal`` () =
         // df1: [a, b]
         use csv1 = new TempCsv "a,b\n1,2"

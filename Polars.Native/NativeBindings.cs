@@ -77,6 +77,8 @@ unsafe internal partial class NativeBindings
     );
     [LibraryImport(LibName)] 
     public static partial DataFrameHandle pl_dataframe_clone(DataFrameHandle df);
+    [LibraryImport(LibName)]
+    public static partial LazyFrameHandle pl_dataframe_lazy(DataFrameHandle df);
     [LibraryImport(LibName)] public static partial IntPtr pl_dataframe_get_string(DataFrameHandle df, [MarshalAs(UnmanagedType.LPUTF8Str)] string colName, UIntPtr row);
     [LibraryImport(LibName)]
     public static partial DataFrameHandle pl_head(DataFrameHandle df, UIntPtr n);

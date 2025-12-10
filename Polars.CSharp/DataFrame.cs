@@ -737,4 +737,26 @@ public class DataFrame : IDisposable
         // 默认回退 (低效但安全)
         return _ => null;
     }
+    // ==========================================
+    // Conversion to Lazy
+    // ==========================================
+
+    /// <summary>
+    /// Convert the DataFrame into a LazyFrame.
+    /// This allows building a query plan and optimizing execution.
+    /// </summary>
+    public LazyFrame Lazy()
+    {
+        // 1. 先克隆 DataFrame Handle。
+        // 为什么？因为 Rust 的 into_lazy() 会消耗掉 DataFrame。
+        // 如果我们直接传 Handle，这个 C# DataFrame 对象就会变废（底层指针被释放或转移），
+        // 用户如果再次使用这个 DataFrame 就会崩。
+        // 为了符合 C# 的直觉（调用 .Lazy() 不应该销毁原对象），我们先 Clone 一份传给 Lazy。
+        var clonedHandle = PolarsWrapper.CloneDataFrame(Handle);
+        
+        // 2. 转换为 LazyFrame
+        var lfHandle = PolarsWrapper.DataFrameToLazy(clonedHandle);
+        
+        return new LazyFrame(lfHandle);
+    }
 }

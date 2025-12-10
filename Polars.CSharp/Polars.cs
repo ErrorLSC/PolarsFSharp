@@ -89,4 +89,11 @@ public static class Polars
         var handles = exprs.Select(e => PolarsWrapper.CloneExpr(e.Handle)).ToArray();
         return new Expr(PolarsWrapper.AsStruct(handles));
     }
+    // ==========================================
+    // SQL Context
+    // ==========================================
+    /// <summary>
+    /// Create a new SQL Context.
+    /// </summary>
+    public static SqlContext Sql() => new();
 }

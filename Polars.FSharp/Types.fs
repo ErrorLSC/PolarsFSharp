@@ -608,7 +608,9 @@ and DataFrame(handle: DataFrameHandle) =
                 dict |> Seq.map (fun kv -> kv.Key, kv.Value) |> Map.ofSeq
             with _ ->
                 Map.empty
-
+    member this.Lazy() : LazyFrame =
+        let lfHandle = PolarsWrapper.DataFrameToLazy handle
+        new LazyFrame(lfHandle)
     /// <summary>
     /// Print the schema to Console.
     /// </summary>
@@ -701,7 +703,7 @@ and DataFrame(handle: DataFrameHandle) =
 /// <summary>
 /// A LazyFrame represents a logical plan of operations that will be optimized and executed only when collected.
 /// </summary>
-type LazyFrame(handle: LazyFrameHandle) =
+and LazyFrame(handle: LazyFrameHandle) =
     member _.Handle = handle
     member internal this.CloneHandle() = PolarsWrapper.LazyClone handle
     /// <summary> Execute the plan and return a DataFrame. </summary>
