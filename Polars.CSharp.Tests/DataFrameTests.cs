@@ -548,4 +548,47 @@ public class TradeRecord
         Assert.Equal("GOOG", row1.Ticker);
         Assert.Null(row1.Factor); // 验证 Null 透传
     }
+    public class LogEntry
+    {
+        public int Id { get; set; }
+        public string Message { get; set; }
+        public DateTime Timestamp { get; set; } // 非空
+        public DateTime? ProcessedAt { get; set; } // 可空
+    }
+
+    [Fact]
+    public void Test_DataFrame_DateTime_RoundTrip()
+    {
+        var now = DateTime.Now;
+        // 去掉 Tick 级精度差异，因为 Microseconds 会丢失 100ns (Ticks) 的精度
+        // 我们把精度截断到秒或毫秒来做测试，或者容忍微小误差
+        now = new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, now.Second);
+
+        var logs = new[]
+        {
+            new LogEntry { Id = 1, Message = "Start", Timestamp = now, ProcessedAt = null },
+            new LogEntry { Id = 2, Message = "End", Timestamp = now.AddMinutes(1), ProcessedAt = now.AddMinutes(2) }
+        };
+
+        // 1. From (C# -> Polars)
+        using var df = DataFrame.From(logs);
+        
+        Assert.Equal(2, df.Height);
+        
+        // 验证 Schema 是否正确变成了 Datetime
+        // (这里只能隐式验证，如果 ToArrow 成功说明类型兼容)
+
+        // 2. To (Polars -> C#)
+        var result = df.Rows<LogEntry>().ToList();
+
+        // 3. 验证
+        var row1 = result[0];
+        Assert.Equal(1, row1.Id);
+        Assert.Equal(now, row1.Timestamp);
+        Assert.Null(row1.ProcessedAt);
+
+        var row2 = result[1];
+        Assert.Equal(now.AddMinutes(1), row2.Timestamp);
+        Assert.Equal(now.AddMinutes(2), row2.ProcessedAt);
+    }
 }

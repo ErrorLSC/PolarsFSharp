@@ -135,7 +135,7 @@ public class Series : IDisposable
             if (type == typeof(decimal))
             {
                 // 非空 Decimal
-                var decArray = array as decimal[] ?? array.Cast<decimal>().ToArray();
+                var decArray = array as decimal[] ?? [.. array.Cast<decimal>()];
                 int scale = DetectMaxScale(decArray);
                 // 调用你刚才写的 Wrapper (它内部会处理 * 10^scale 转 Int128)
                 return new Series(name, PolarsWrapper.SeriesNewDecimal(name, decArray, null, scale));
@@ -151,7 +151,51 @@ public class Series : IDisposable
                 return new Series(name, PolarsWrapper.SeriesNewDecimal(name, decArray, scale));
             }
         }
+        // --- 7. DateTime ---
+        if (underlyingType == typeof(DateTime))
+        {
+            // 定义 Unix Epoch Ticks (1970-01-01)
+            const long UnixEpochTicks = 621355968000000000L;
+            const long TicksPerMicrosecond = 10L;
 
+            // 转换函数: DateTime -> long (Microseconds since Epoch)
+            long ToMicros(DateTime dt) => (dt.Ticks - UnixEpochTicks) / TicksPerMicrosecond;
+
+            if (type == typeof(DateTime))
+            {
+                // 非空
+                var dtArray = array as DateTime[] ?? array.Cast<DateTime>().ToArray();
+                var longArray = new long[dtArray.Length];
+                for(int i=0; i<dtArray.Length; i++) longArray[i] = ToMicros(dtArray[i]);
+                
+                // 先创建 Int64 Series，再 Cast 为 Datetime(Microseconds)
+                using var temp = new Series(name, longArray);
+                return temp.Cast(DataType.Datetime); 
+            }
+            else
+            {
+                // 可空 DateTime?
+                var dtArray = array.Cast<DateTime?>().ToArray();
+                var longArray = new long[dtArray.Length];
+                var validity = new bool[dtArray.Length];
+                
+            for(int i = 0; i < dtArray.Length; i++)
+                {
+                    if (dtArray[i] is DateTime dt)
+                    {
+                        longArray[i] = ToMicros(dt);
+                        validity[i] = true;
+                    }
+                    else
+                    {
+                        longArray[i] = 0;
+                        validity[i] = false;
+                    }
+                }
+                using var temp = new Series(name, longArray, validity);
+                return temp.Cast(DataType.Datetime);
+            }
+        }
         throw new NotSupportedException($"Type {type.Name} is not supported for Series creation via Create<T>.");
     }
 

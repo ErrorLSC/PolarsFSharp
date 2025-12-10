@@ -674,7 +674,21 @@ public class DataFrame : IDisposable
                 return null;
             };
         }
-
+        // 6. DateTime
+        if (underlyingType == typeof(DateTime))
+        {
+            return idx => 
+            {
+                // 调用 ArrowExtensions.GetDateTime (它会自动处理 Date32/Date64/Timestamp)
+                DateTime? val = array.GetDateTime(idx);
+                
+                if (!val.HasValue) return null;
+                
+                // 如果目标是 DateTime (非空)，直接返回 Value
+                // 如果目标是 DateTime?，也返回 Value (会被装箱)
+                return val.Value;
+            };
+        }
         // 默认回退 (低效但安全)
         return _ => null;
     }
