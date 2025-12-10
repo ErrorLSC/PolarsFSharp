@@ -597,3 +597,37 @@ pub extern "C" fn pl_series_to_frame(ptr: *mut SeriesContext) -> *mut DataFrameC
         Ok(Box::into_raw(Box::new(DataFrameContext { df })))
     })
 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_dataframe_new(
+    columns_ptr: *const *mut SeriesContext, // 指向 SeriesContext 指针数组的指针
+    len: usize,
+) -> *mut DataFrameContext {
+    ffi_try!({
+        // 1. 校验输入
+        if columns_ptr.is_null() || len == 0 {
+            // 返回空 DataFrame
+            return Ok(Box::into_raw(Box::new(DataFrameContext { df: DataFrame::default() })));
+        }
+
+        // 2. 将 C 数组转换为 Rust Vec<Series>
+        let slice = unsafe { std::slice::from_raw_parts(columns_ptr, len) };
+        let mut series_vec = Vec::with_capacity(len);
+
+        for &ptr in slice {
+            if !ptr.is_null() {
+                let ctx = unsafe { &*ptr };
+                // [关键] Clone Series。
+                // Series 底层是 Arc 的，所以这里只是增加引用计数。
+                // 这样 C# 那边的 SeriesHandle 依然有效，不会被这里消耗掉。
+                series_vec.push(ctx.series.clone().into());
+            }
+        }
+
+        // 3. 创建 DataFrame
+        // Polars 会检查所有 Series 长度是否一致，名字是否重复等
+        let df = DataFrame::new(series_vec)?;
+
+        Ok(Box::into_raw(Box::new(DataFrameContext { df })))
+    })
+}

@@ -187,6 +187,26 @@ type ``Basic Functionality Tests`` () =
         let joinedBob = df.String("joined", 1)
         Assert.True joinedBob.IsNone
     [<Fact>]
+    member _.``DataFrame: Create from Series`` () =
+        // 1. 创建两个独立的 Series
+        use s1 = Series.create("id", [1; 2; 3])
+        use s2 = Series.create("name", ["a"; "b"; "c"])
+
+        // 2. 组合成 DataFrame
+        use df = DataFrame.create [s1; s2]
+
+        // 3. 验证
+        Assert.Equal(3L, df.Rows)
+        Assert.Equal(2L, df.Columns)
+        Assert.Equal<string seq>(["id"; "name"], df.ColumnNames)
+        
+        // 4. [关键] 验证原来的 Series 依然可用 (未被 Move)
+        // 如果 Rust 端不是 Clone 而是 Move，这里就会崩
+        Assert.Equal(3L, s1.Length)
+        
+        // 5. 打印看看
+        Polars.show df |> ignore
+    [<Fact>]
     member _.``Reshaping: Concat Diagonal`` () =
         // df1: [a, b]
         use csv1 = new TempCsv "a,b\n1,2"

@@ -37,7 +37,11 @@ unsafe internal partial class NativeBindings
         CArrowArray* cArray, 
         CArrowSchema* cSchema
     );
-
+    [LibraryImport(LibName)]
+    public static partial DataFrameHandle pl_dataframe_new(
+        IntPtr[] columns, 
+        UIntPtr len
+    );
     [LibraryImport(LibName, StringMarshalling = StringMarshalling.Utf8)] 
     public static partial ExprHandle pl_expr_col(string name);
     [LibraryImport(LibName)] 

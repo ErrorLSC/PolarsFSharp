@@ -486,6 +486,20 @@ and DataFrame(handle: DataFrameHandle) =
     member this.Clone() = new DataFrame(PolarsWrapper.CloneDataFrame handle)
     member internal this.CloneHandle() = PolarsWrapper.CloneDataFrame handle
     member _.Handle = handle
+    static member create(series: Series list) : DataFrame =
+        let handles = 
+            series 
+            |> List.map (fun s -> s.Handle) 
+            |> List.toArray
+            
+        let h = PolarsWrapper.DataFrameNew handles
+        new DataFrame(h)
+        
+    // 重载：允许变长参数 (df = DataFrame.create(s1, s2, s3))
+    static member create([<System.ParamArray>] series: Series[]) : DataFrame =
+        let handles = series |> Array.map (fun s -> s.Handle)
+        let h = PolarsWrapper.DataFrameNew handles
+        new DataFrame(h)
     // Interop
     member this.ToArrow() = PolarsWrapper.Collect handle
     member _.Rows = PolarsWrapper.DataFrameHeight handle
