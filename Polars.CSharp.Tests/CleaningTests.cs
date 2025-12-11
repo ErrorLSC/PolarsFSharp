@@ -18,7 +18,7 @@ public class CleaningTests
         // null
         var content = "val\n1\n\n\n2\n\n"; 
         
-        using var csv = new DisposableCsv(content);
+        using var csv = new DisposableFile(content, ".csv");
         using var df = DataFrame.ReadCsv(csv.Path);
         
         // Forward Fill (limit=null -> 0 -> Infinite)
@@ -59,7 +59,7 @@ public class CleaningTests
         // [关键] 无缩进 CSV
         var content = "A,B,C\n1,x,10\n,y,20\n3,,30\n";
         
-        using var csv = new DisposableCsv(content);
+        using var csv = new DisposableFile(content, ".csv");
         using var df = DataFrame.ReadCsv(csv.Path);
 
         // --- 1. FillNull ---

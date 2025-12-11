@@ -74,7 +74,7 @@ public static class UdfLogic
                 else 
                 {
                     // 简单的数值计算
-                    double val = (double)i64Arr.GetValue(i).Value;
+                    double val = i64Arr.GetValue(i).Value;
                     builder.Append(val / 2.0);
                 }
             }
@@ -141,8 +141,8 @@ public class UdfTests
     {
         // 1. 准备数据 (5行)
         
-        using var csv = new DisposableCsv("num\n15\n25\n" +
-                                          "35\n45\n55\n");
+        using var csv = new DisposableFile("num\n15\n25\n" +
+                                          "35\n45\n55\n",".csv");
         using var df = DataFrame.ReadCsv(csv.Path);
         Assert.Equal(5, df.Height); // 确保数据是 5 行
 
@@ -169,7 +169,7 @@ public class UdfTests
     {
         // 1. 准备数据
         // F#: use csv = new TempCsv "num\n100\n200"
-        using var csv = new DisposableCsv("num\n100\n200\n");
+        using var csv = new DisposableFile("num\n100\n200\n",".csv");
         using var lf = LazyFrame.ScanCsv(csv.Path);
 
         // 2. 构造 C# 委托
@@ -196,7 +196,7 @@ public class UdfTests
     public void Map_UDF_Error_Is_Propagated_To_CSharp()
     {
         // 1. 准备数据
-        using var csv = new DisposableCsv("num\n1");
+        using var csv = new DisposableFile("num\n1",".csv");
         using var lf = LazyFrame.ScanCsv(csv.Path);
 
         Func<IArrowArray, IArrowArray> udf = UdfLogic.AlwaysFail;
@@ -219,7 +219,7 @@ public class UdfTests
         // 场景 1: 简单的数值计算 (Int64 -> Int64)
         // 用户不需要知道 IArrowArray，只需要写 Lambda
         
-        using var csv = new DisposableCsv("num\n10\n20\n30\n");
+        using var csv = new DisposableFile("num\n10\n20\n30\n",".csv");
         using var df = DataFrame.ReadCsv(csv.Path);
 
         // 定义逻辑: x * 2
@@ -240,7 +240,7 @@ public class UdfTests
         // 场景 2: 字符串处理 (String -> String)
         // 模拟业务逻辑：给名字加前缀
         
-        using var csv = new DisposableCsv("name\nAlice\nBob\n");
+        using var csv = new DisposableFile("name\nAlice\nBob\n",".csv");
         using var df = DataFrame.ReadCsv(csv.Path);
 
         // 定义逻辑: "Hello, {name}!"
@@ -261,7 +261,7 @@ public class UdfTests
         // 场景 3: 跨类型转换 (Int64 -> String)
         // 这是最常用的场景之一，比如格式化数字
         
-        using var csv = new DisposableCsv("id\n1001\n1002\n");
+        using var csv = new DisposableFile("id\n1001\n1002\n",".csv");
         using var df = DataFrame.ReadCsv(csv.Path);
 
         // 定义逻辑: 将 ID 格式化为 "Order-#ID"
@@ -281,7 +281,7 @@ public class UdfTests
     {
         // 构造数据: 10, 0, 20
         // 我们想把 0 变成 Null
-        using var csv = new DisposableCsv("num\n10\n0\n20\n");
+        using var csv = new DisposableFile("num\n10\n0\n20\n",".csv");
         using var df = DataFrame.ReadCsv(csv.Path);
 
         // 逻辑: 如果是 0 返回 null (C# null)，否则返回原值
@@ -301,7 +301,7 @@ public class UdfTests
     public void Test_UDF_Nullable_Input()
     {
         // 数据: 10, null
-        using var csv = new DisposableCsv("num\n10\n\n"); // 第二行是空
+        using var csv = new DisposableFile("num\n10\n\n",".csv"); // 第二行是空
         using var df = DataFrame.ReadCsv(csv.Path);
 
         // 逻辑: 输入 int? -> 输出 string

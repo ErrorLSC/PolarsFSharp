@@ -3,6 +3,7 @@ use polars_arrow::ffi::{self, ArrowArray, ArrowSchema, export_array_to_c, export
 use polars_arrow::array::StructArray;
 use polars_arrow::datatypes::{ArrowDataType, Field};
 use polars_core::prelude::CompatLevel;
+use std::ffi::CStr;
 use std::io::BufReader;
 use std::os::raw::c_char;
 use std::fs::File;
@@ -267,6 +268,33 @@ pub extern "C" fn pl_write_parquet(df_ptr: *mut DataFrameContext, path_ptr: *con
     })
 }
 
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_dataframe_write_ipc(df_ptr: *mut DataFrameContext, path: *const c_char) {
+    ffi_try_void!({
+        let ctx = unsafe { &mut *df_ptr };
+        let p = unsafe { CStr::from_ptr(path).to_string_lossy() };
+        
+        let file = File::create(p.as_ref()).map_err(|e| PolarsError::ComputeError(e.to_string().into()))?;
+        
+        IpcWriter::new(file)
+            .finish(&mut ctx.df)
+    })
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_dataframe_write_json(df_ptr: *mut DataFrameContext, path: *const c_char) {
+    ffi_try_void!({
+        let ctx = unsafe { &mut *df_ptr };
+        let p = unsafe { CStr::from_ptr(path).to_string_lossy() };
+        
+        let file = File::create(p.as_ref()).map_err(|e| PolarsError::ComputeError(e.to_string().into()))?;
+        
+        // 默认输出为标准 JSON Array 格式
+        JsonWriter::new(file)
+        .with_json_format(JsonFormat::Json)
+        .finish(&mut ctx.df)
+    })
+}
 // ==========================================
 // 3. 内存与转换操作
 // ==========================================

@@ -11,7 +11,7 @@ public class ExprTests
     [Fact]
     public void Select_Inline_Style_Pythonic()
     {
-        using var csv = new DisposableCsv("name,birthdate,weight,height\nQinglei,2025-11-25,70,1.80");
+        using var csv = new DisposableFile("name,birthdate,weight,height\nQinglei,2025-11-25,70,1.80",".csv");
         using var df = DataFrame.ReadCsv(csv.Path);
 
         // 像 Python 一样写在 Select 参数里！
@@ -52,7 +52,7 @@ public class ExprTests
     [Fact]
     public void Filter_By_Numeric_Value_Gt()
     {
-        using var csv = new DisposableCsv("val\n10\n20\n30");
+        using var csv = new DisposableFile("val\n10\n20\n30",".csv");
         using var df = DataFrame.ReadCsv(csv.Path);
 
         // C# 运算符重载: Col("val") > Lit(15)
@@ -77,7 +77,7 @@ Ben Brown,1985-02-15,72.5,1.77
 Qinglei,2025-11-25,70.0,1.80
 Zhang,2025-10-31,55,1.75";
         
-        using var csv = new DisposableCsv(content);
+        using var csv = new DisposableFile(content,".csv");
         // tryParseDates 默认为 true
         using var df = DataFrame.ReadCsv(csv.Path);
 
@@ -95,7 +95,7 @@ Zhang,2025-10-31,55,1.75";
     [Fact]
     public void Filter_By_String_Value_Eq()
     {
-        using var csv = new DisposableCsv("name\nAlice\nBob\nAlice");
+        using var csv = new DisposableFile("name\nAlice\nBob\nAlice",".csv");
         using var df = DataFrame.ReadCsv(csv.Path);
         
         // 逻辑: name == "Alice"
@@ -110,7 +110,7 @@ Zhang,2025-10-31,55,1.75";
     [Fact]
     public void Filter_By_Double_Value_Eq()
     {
-        using var csv = new DisposableCsv("value\n3.36\n4.2\n5\n3.36");
+        using var csv = new DisposableFile("value\n3.36\n4.2\n5\n3.36",".csv");
         using var df = DataFrame.ReadCsv(csv.Path);
         
         // 逻辑: value == 3.36
@@ -128,7 +128,7 @@ Zhang,2025-10-31,55,1.75";
     {
         // 构造 CSV: age 列包含 10, null, 30
         // 注意 CSV 中的空行会被解析为 null
-        using var csv = new DisposableCsv("age\n10\n\n30");
+        using var csv = new DisposableFile("age\n10\n\n30",".csv");
         using var df = DataFrame.ReadCsv(csv.Path);
 
         // --- 测试 1: FillNull ---
@@ -162,7 +162,7 @@ Qinglei,1990-05-20,1.80
 TooOld,1980-01-01,1.80
 TooShort,1990-05-20,1.60";
 
-        using var csv = new DisposableCsv(content);
+        using var csv = new DisposableFile(content,".csv");
         
         // 必须开启日期解析 (tryParseDates: true)
         using var df = DataFrame.ReadCsv(csv.Path, tryParseDates: true);
@@ -191,7 +191,7 @@ TooShort,1990-05-20,1.60";
     public void Math_Ops_BMI_Calculation_With_Pow()
     {
         // 构造数据: 身高(m), 体重(kg)
-        using var csv = new DisposableCsv("name,height,weight\nAlice,1.65,60\nBob,1.80,80");
+        using var csv = new DisposableFile("name,height,weight\nAlice,1.65,60\nBob,1.80,80",".csv");
         using var df = DataFrame.ReadCsv(csv.Path);
 
         // 目标逻辑: weight / (height ^ 2)
@@ -222,7 +222,7 @@ TooShort,1990-05-20,1.60";
     public void String_Operations_Case_Slice_Replace()
     {
         // 脏数据: "Hello World", "foo BAR"
-        using var csv = new DisposableCsv("text\nHello World\nfoo BAR");
+        using var csv = new DisposableFile("text\nHello World\nfoo BAR",".csv");
         using var df = DataFrame.ReadCsv(csv.Path);
 
         using var res = df.Select(
@@ -257,7 +257,7 @@ TooShort,1990-05-20,1.60";
     [Fact]
     public void String_Regex_Replace_And_Extract()
     {
-        using var csv = new DisposableCsv("text\nUser: 12345\nID: 999");
+        using var csv = new DisposableFile("text\nUser: 12345\nID: 999",".csv");
         using var df = DataFrame.ReadCsv(csv.Path);
 
         using var res = df.Select(
@@ -286,7 +286,7 @@ TooShort,1990-05-20,1.60";
     {
         // 构造数据: 包含日期和时间的字符串
         var csvContent = "ts\n2023-12-25 15:30:00\n2024-01-01 00:00:00";
-        using var csv = new DisposableCsv(csvContent);
+        using var csv = new DisposableFile(csvContent,".csv");
 
         // [关键] 开启 tryParseDates=true
         using var df = DataFrame.ReadCsv(csv.Path, tryParseDates: true);
@@ -343,7 +343,7 @@ TooShort,1990-05-20,1.60";
     [Fact]
     public void Cast_Ops_Int_To_Float_String_To_Int()
     {
-        using var csv = new DisposableCsv("val_str,val_int\n100,10\n200,20");
+        using var csv = new DisposableFile("val_str,val_int\n100,10\n200,20",".csv");
         using var df = DataFrame.ReadCsv(csv.Path);
 
         using var res = df.Select(
@@ -375,7 +375,7 @@ TooShort,1990-05-20,1.60";
     public void Control_Flow_IfElse()
     {
         // 构造成绩数据
-        using var csv = new DisposableCsv("student,score\nAlice,95\nBob,70\nCharlie,50");
+        using var csv = new DisposableFile("student,score\nAlice,95\nBob,70\nCharlie,50",".csv");
         using var df = DataFrame.ReadCsv(csv.Path);
 
         // 逻辑:
@@ -418,7 +418,7 @@ TooShort,1990-05-20,1.60";
     public void Struct_And_Advanced_List_Ops()
     {
         // 构造数据: Alice 考了两次试
-        using var csv = new DisposableCsv("name,score1,score2\nAlice,80,90\nBob,60,70");
+        using var csv = new DisposableFile("name,score1,score2\nAlice,80,90\nBob,60,70",".csv");
         using var df = DataFrame.ReadCsv(csv.Path);
 
         // 逻辑 4 的表达式: "1 5 2" -> Split -> Sort(Desc) -> First

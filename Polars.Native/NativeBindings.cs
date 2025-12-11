@@ -229,6 +229,11 @@ unsafe internal partial class NativeBindings
     public static partial void pl_write_csv(DataFrameHandle df, [MarshalAs(UnmanagedType.LPUTF8Str)] string path);
     [LibraryImport(LibName)] 
     public static partial void pl_write_parquet(DataFrameHandle df, [MarshalAs(UnmanagedType.LPUTF8Str)] string path);
+    [LibraryImport(LibName, StringMarshalling = StringMarshalling.Utf8)]
+    public static partial void pl_dataframe_write_ipc(DataFrameHandle df, string path);
+
+    [LibraryImport(LibName, StringMarshalling = StringMarshalling.Utf8)]
+    public static partial void pl_dataframe_write_json(DataFrameHandle df, string path);
     [LibraryImport(LibName)] 
     public static partial DataFrameHandle pl_read_parquet([MarshalAs(UnmanagedType.LPUTF8Str)] string path);
     // --- JSON IO ---

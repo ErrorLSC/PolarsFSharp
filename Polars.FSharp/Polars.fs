@@ -65,6 +65,19 @@ module Polars =
     let writeParquet (path: string) (df: DataFrame) = 
         PolarsWrapper.WriteParquet(df.Handle, path)
         df
+    /// <summary>
+    /// Write DataFrame to an Arrow IPC (Feather) file.
+    /// This is a fast, zero-copy binary format.
+    /// </summary>
+    let WriteIpc(path: string) (df:DataFrame) =
+        PolarsWrapper.WriteIpc(df.Handle, path)
+        df
+    /// <summary>
+    /// Write DataFrame to a JSON file (standard array format).
+    /// </summary>
+    let WriteJson(path: string) (df:DataFrame) =
+        PolarsWrapper.WriteJson(df.Handle, path)
+        df
     /// <summary> Write LazyFrame execution result to Parquet (Streaming). </summary>
     let sinkParquet (path: string) (lf: LazyFrame) : unit =
         let lfClone = lf.CloneHandle()

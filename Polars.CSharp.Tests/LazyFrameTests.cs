@@ -13,7 +13,7 @@ Alice,25,50000
 Bob,30,60000
 Charlie,35,70000
 David,40,80000";
-        using var csv = new DisposableCsv(csvContent);
+        using var csv = new DisposableFile(csvContent, ".csv");
         // 2. Scan CSV
         using var lf = LazyFrame.ScanCsv(csv.Path);
         using var lf_copyed = lf.Clone();
@@ -46,10 +46,10 @@ David,40,80000";
     public void Test_Lazy_Concat_Horizontal_And_Safety()
     {
         // 准备两个 LazyFrame
-        using var csv1 = new DisposableCsv("id\n1\n2");
+        using var csv1 = new DisposableFile("id\n1\n2",".csv");
         using var lf1 = LazyFrame.ScanCsv(csv1.Path);
 
-        using var csv2 = new DisposableCsv("name\nAlice\nBob");
+        using var csv2 = new DisposableFile("name\nAlice\nBob",".csv");
         using var lf2 = LazyFrame.ScanCsv(csv2.Path);
 
         // 1. 执行 Horizontal Concat
@@ -78,11 +78,11 @@ David,40,80000";
     public void Test_Lazy_Concat_Diagonal()
     {
         // LF1: [A, B]
-        using var csv1 = new DisposableCsv("A,B\n1,10");
+        using var csv1 = new DisposableFile("A,B\n1,10",".csv");
         using var lf1 = LazyFrame.ScanCsv(csv1.Path);
 
         // LF2: [B, C]
-        using var csv2 = new DisposableCsv("B,C\n20,300");
+        using var csv2 = new DisposableFile("B,C\n20,300",".csv");
         using var lf2 = LazyFrame.ScanCsv(csv2.Path);
 
         // Diagonal Concat (Lazy)
@@ -123,7 +123,7 @@ David,40,80000";
 Alice,2023,85
 Alice,2024,90
 Bob,2023,70";
-        using var scoresCsv = new DisposableCsv(scoresContent);
+        using var scoresCsv = new DisposableFile(scoresContent,".csv");
         using var scoresLf = LazyFrame.ScanCsv(scoresCsv.Path);
 
         // 场景：班级分配表
@@ -133,7 +133,7 @@ Bob,2023,70";
 Alice,2023,Math
 Alice,2024,Physics
 Bob,2024,History";
-        using var classCsv = new DisposableCsv(classContent);
+        using var classCsv = new DisposableFile(classContent,".csv");
         using var classLf = LazyFrame.ScanCsv(classCsv.Path);
 
         // 执行多列 Join (Inner Join)
@@ -185,7 +185,7 @@ IT,100
 IT,200
 HR,150
 HR,50";
-        using var scoresCsv = new DisposableCsv(csvContent);
+        using var scoresCsv = new DisposableFile(csvContent,".csv");
 
 
         using var lf = LazyFrame.ScanCsv(scoresCsv.Path);
@@ -216,7 +216,7 @@ HR,50";
 2024-01-01,10,20
 2024-01-02,12,22";
         
-        using var csv = new DisposableCsv(content);
+        using var csv = new DisposableFile(content,".csv");
         using var lf = LazyFrame.ScanCsv(csv.Path);
 
         // 构建 Lazy 查询: Unpivot (Melt)
@@ -263,7 +263,7 @@ HR,50";
 10:00,AAPL,10
 10:02,AAPL,20
 10:05,AAPL,5";
-        using var tradesCsv = new DisposableCsv(tradesContent);
+        using var tradesCsv = new DisposableFile(tradesContent,".csv");
         
         // Quotes: 报价更新时间
         // 09:59 (Bid=150)
@@ -273,7 +273,7 @@ HR,50";
 09:59,AAPL,150
 10:01,AAPL,151
 10:06,AAPL,152";
-        using var quotesCsv = new DisposableCsv(quotesContent);
+        using var quotesCsv = new DisposableFile(quotesContent,".csv");
 
         // 使用 tryParseDates=false，这里演示用字符串/时间戳进行 JoinAsOf
         // 只要列是可排序的 (Sortable)，JoinAsOf 就能工作。

@@ -36,6 +36,39 @@ type ``Basic Functionality Tests`` () =
         finally
             System.IO.File.Delete tmpParquet
     [<Fact>]
+    member _.``IO: Write & Read IPC/JSON`` () =
+        let pathIpc = "test_output.ipc"
+        let pathJson = "test_output.json"
+        
+        try
+            // 1. 准备数据
+            let s1 = Series.create("a", [1; 2; 3])
+            let s2 = Series.create("b", ["x"; "y"; "z"])
+            use df = DataFrame.create [s1; s2]
+
+            // 2. 测试 IPC (Feather)
+            df |> Polars.WriteIpc pathIpc |> ignore
+            Assert.True(System.IO.File.Exists pathIpc)
+            
+            // 读回来验证
+            use dfIpc = Polars.readIpc pathIpc
+            Assert.Equal(3L, dfIpc.Rows)
+            Assert.Equal("x", dfIpc.String("b", 0).Value)
+
+            // 3. 测试 JSON
+            df |> Polars.WriteJson pathJson |> ignore
+            Assert.True(System.IO.File.Exists pathJson)
+            
+            // 读回来验证
+            use dfJson = Polars.readJson pathJson
+            Assert.Equal(3L, dfJson.Rows)
+            Assert.Equal(2L, dfJson.Int("a", 1).Value)
+
+        finally
+            // 清理垃圾
+            if System.IO.File.Exists(pathIpc) then System.IO.File.Delete pathIpc
+            if System.IO.File.Exists(pathJson) then System.IO.File.Delete pathJson
+    [<Fact>]
     member _.``Streaming, Sink(untested)`` () =
         // 1. 准备宽表数据 (Sales Data)
         // Year, Q1, Q2

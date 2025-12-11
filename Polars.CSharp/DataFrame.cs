@@ -442,6 +442,22 @@ public class DataFrame : IDisposable
         PolarsWrapper.WriteParquet(Handle, path);
     }
     /// <summary>
+    /// Write DataFrame to IPC File    
+    /// </summary>
+    /// <param name="path"></param>
+    public void WriteIpc(string path)
+    {
+        PolarsWrapper.WriteIpc(Handle, path);
+    }
+    /// <summary>
+    /// Write DataFrame to JSON File
+    /// </summary>
+    /// <param name="path"></param>
+    public void WriteJson(string path)
+    {
+        PolarsWrapper.WriteJson(Handle, path);
+    }
+    /// <summary>
     /// Generate a summary statistics DataFrame (count, mean, std, min, 25%, 50%, 75%, max).
     /// Similar to pandas/polars describe().
     /// </summary>

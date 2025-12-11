@@ -131,7 +131,7 @@ HR,50";
 Alice,2023,85
 Alice,2024,90
 Bob,2023,70";
-        using var scoresCsv = new DisposableCsv(scoresContent);
+        using var scoresCsv = new DisposableFile(scoresContent, ".csv");
         using var scoresDf = DataFrame.ReadCsv(scoresCsv.Path);
 
         // 场景：班级分配表
@@ -141,7 +141,7 @@ Bob,2023,70";
 Alice,2023,Math
 Alice,2024,Physics
 Bob,2024,History";
-        using var classCsv = new DisposableCsv(classContent);
+        using var classCsv = new DisposableFile(classContent, ".csv");
         using var classDf = DataFrame.ReadCsv(classCsv.Path);
 
         // 执行多列 Join (Inner Join)
@@ -193,10 +193,10 @@ Bob,2024,History";
         // --- 1. Vertical (垂直拼接) ---
         // 场景：两份数据结构相同，上下堆叠
         {
-            using var csv1 = new DisposableCsv("id,name\n1,Alice");
+            using var csv1 = new DisposableFile("id,name\n1,Alice","csv");
             using var df1 = DataFrame.ReadCsv(csv1.Path);
 
-            using var csv2 = new DisposableCsv("id,name\n2,Bob");
+            using var csv2 = new DisposableFile("id,name\n2,Bob","csv");
             using var df2 = DataFrame.ReadCsv(csv2.Path);
 
             using var res = DataFrame.Concat([df1, df2], ConcatType.Vertical);
@@ -212,10 +212,10 @@ Bob,2024,History";
         // --- 2. Horizontal (水平拼接) ---
         // 场景：行数相同，列不同，左右拼接
         {
-            using var csv1 = new DisposableCsv("id\n1\n2");
+            using var csv1 = new DisposableFile("id\n1\n2",".csv");
             using var df1 = DataFrame.ReadCsv(csv1.Path);
 
-            using var csv2 = new DisposableCsv("name,age\nAlice,20\nBob,30");
+            using var csv2 = new DisposableFile("name,age\nAlice,20\nBob,30",".csv");
             using var df2 = DataFrame.ReadCsv(csv2.Path);
 
             using var res = DataFrame.Concat(new[] { df1, df2 }, ConcatType.Horizontal);
@@ -238,10 +238,10 @@ Bob,2024,History";
         // DF2: [B, C]
         // Result: [A, B, C]
         {
-            using var csv1 = new DisposableCsv("A,B\n1,10");
+            using var csv1 = new DisposableFile("A,B\n1,10",".csv");
             using var df1 = DataFrame.ReadCsv(csv1.Path);
 
-            using var csv2 = new DisposableCsv("B,C\n20,300");
+            using var csv2 = new DisposableFile("B,C\n20,300",".csv");
             using var df2 = DataFrame.ReadCsv(csv2.Path);
 
             using var res = DataFrame.Concat(new[] { df1, df2 }, ConcatType.Diagonal);
@@ -273,7 +273,7 @@ Bob,2024,History";
 2024-01-02,NY,2
 2024-01-02,LA,18";
         
-        using var csv = new DisposableCsv(content);
+        using var csv = new DisposableFile(content,".csv");
         using var df = DataFrame.ReadCsv(csv.Path);
 
         // --- Step 1: Pivot (长 -> 宽) ---
@@ -366,7 +366,7 @@ Bob,2024,History";
     {
         // 构造数据: 1, 2, 3, 4, 5
         var content = "val\n1\n2\n3\n4\n5\n"; 
-        using var csv = new DisposableCsv(content);
+        using var csv = new DisposableFile(content,".csv");
         using var df = DataFrame.ReadCsv(csv.Path);
 
         // 调用 Describe
@@ -402,7 +402,7 @@ Bob,2024,History";
 2024-01-03,30
 2024-01-04,40
 2024-01-05,50";
-        using var csv = new DisposableCsv(content);
+        using var csv = new DisposableFile(content,".csv");
         using var df = DataFrame.ReadCsv(csv.Path, tryParseDates: true);
 
         // 逻辑: 3天滑动窗口求平均 (Rolling Mean)
@@ -439,7 +439,7 @@ A,2
 B,3
 B,4
 B,5";
-        using var csv = new DisposableCsv(content);
+        using var csv = new DisposableFile(content,".csv");
         using var df = DataFrame.ReadCsv(csv.Path);
 
         using var res = df

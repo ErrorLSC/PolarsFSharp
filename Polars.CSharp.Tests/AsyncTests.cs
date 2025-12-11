@@ -11,7 +11,7 @@ public class AsyncTests
     public async Task Test_Async_IO_And_Execution()
     {
         // 1. 准备数据
-        using var csv = new DisposableCsv("id,val\n1,10\n2,20\n3,30\n");
+        using var csv = new DisposableFile("id,val\n1,10\n2,20\n3,30\n", ".csv");
 
         // 2. 测试 DataFrame.ReadCsvAsync
         using var df = await DataFrame.ReadCsvAsync(csv.Path);
@@ -21,7 +21,7 @@ public class AsyncTests
 
         // 3. 构造 Lazy 查询
         // 逻辑: Filter(val > 15) -> Select(id)
-        using var lf = LazyFrame.ScanCsv(new DisposableCsv("id,val\n1,10\n2,20\n3,30").Path);
+        using var lf = LazyFrame.ScanCsv(new DisposableFile("id,val\n1,10\n2,20\n3,30",".csv").Path);
         
         var query = lf
             .Filter(Col("val") > Lit(15))
@@ -44,7 +44,7 @@ public class AsyncTests
         // 测试 Scan (Lazy Read) + Async Collect
         // Scan 本身通常很快（只读元数据），但 Collect 会触发实际读取
         
-        using var csv = new DisposableCsv("name,score\nAlice,99\nBob,59\n");
+        using var csv = new DisposableFile("name,score\nAlice,99\nBob,59\n",".csv");
         
         // Scan 是同步的 (因为它只建立计划，不读数据)
         using var lf = LazyFrame.ScanCsv(csv.Path);
