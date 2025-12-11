@@ -385,6 +385,33 @@ Bob,2024,History";
         headDf.Show();
         tailDf.Show();
     }
+    [Fact]
+    public void Test_Describe_Logic()
+    {
+        // 构造数据: 1, 2, 3, 4, 5
+        var content = "val\n1\n2\n3\n4\n5\n"; 
+        using var csv = new DisposableCsv(content);
+        using var df = DataFrame.ReadCsv(csv.Path);
+
+        // 调用 Describe
+        using var summary = df.Describe();
+        
+        // 打印看看 (此时应该能用 PrintSchema 或 Show 了)
+        summary.Show(); 
+
+        // 验证行数: count, null_count, mean, std, min, 25%, 50%, 75%, max
+        Assert.Equal(9, summary.Height);
+        
+        // 验证 Mean (第3行)
+        // statistic="mean", val=3.0
+        // 我们用 Filter 取出来验证
+        using var meanRow = summary.Filter(Col("statistic") == Lit("mean"));
+        Assert.Equal(3.0, meanRow.GetValue<double>(0, "val"));
+        
+        // 验证 Min
+        using var minRow = summary.Filter(Col("statistic") == Lit("min"));
+        Assert.Equal(1.0, minRow.GetValue<double>(0, "val"));
+    }
     // ==========================================
     // Rolling & List & Name Ops Tests
     // ==========================================

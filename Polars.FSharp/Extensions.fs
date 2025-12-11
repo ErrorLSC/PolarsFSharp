@@ -437,7 +437,7 @@ module Serialization =
             let numericCols = 
                 this.Schema 
                 |> Map.filter (fun _ dtype -> 
-                    dtype.StartsWith("i") || dtype.StartsWith("f") || dtype.StartsWith("u")
+                    dtype.StartsWith "i" || dtype.StartsWith "f" || dtype.StartsWith "u"
                 )
                 |> Map.keys
                 |> Seq.toList

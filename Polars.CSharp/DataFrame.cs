@@ -441,6 +441,80 @@ public class DataFrame : IDisposable
         //
         PolarsWrapper.WriteParquet(Handle, path);
     }
+    /// <summary>
+    /// Generate a summary statistics DataFrame (count, mean, std, min, 25%, 50%, 75%, max).
+    /// Similar to pandas/polars describe().
+    /// </summary>
+    public DataFrame Describe()
+    {
+        // 1. 筛选数值列
+        var schema = this.Schema;
+        var numericCols = schema
+            .Where(kv => IsNumeric(kv.Value))
+            .Select(kv => kv.Key)
+            .ToList();
+
+        if (numericCols.Count == 0)
+            throw new InvalidOperationException("No numeric columns to describe.");
+
+        // 2. 定义统计指标
+        // 每个指标是一个 Tuple: (Name, Func<colName, Expr>)
+        var metrics = new List<(string Name, Func<string, Expr> Op)>
+        {
+            ("count",      c => Polars.Col(c).Count().Cast(DataType.Float64)),
+            ("null_count", c => Polars.Col(c).IsNull().Sum().Cast(DataType.Float64)),
+            ("mean",       c => Polars.Col(c).Mean()),
+            ("std",        c => Polars.Col(c).Std()),
+            ("min",        c => Polars.Col(c).Min().Cast(DataType.Float64)),
+            ("25%",        c => Polars.Col(c).Quantile(0.25, "nearest").Cast(DataType.Float64)),
+            ("50%",        c => Polars.Col(c).Median().Cast(DataType.Float64)),
+            ("75%",        c => Polars.Col(c).Quantile(0.75, "nearest").Cast(DataType.Float64)),
+            ("max",        c => Polars.Col(c).Max().Cast(DataType.Float64))
+        };
+
+        // 3. 计算每一行 (Row Frames)
+        var rowFrames = new List<DataFrame>();
+        
+        try
+        {
+            foreach (var (statName, op) in metrics)
+            {
+                // 构建 Select 表达式列表: [ Lit(statName).Alias("statistic"), op(col1), op(col2)... ]
+                var exprs = new List<Expr>
+                {
+                    Polars.Lit(statName).Alias("statistic")
+                };
+
+                foreach (var col in numericCols)
+                {
+                    exprs.Add(op(col));
+                }
+
+                // 执行 Select -> 得到 1 行 N 列的 DataFrame
+                // 注意：Select 返回新 DF，我们需要收集起来
+                rowFrames.Add(this.Select([.. exprs]));
+            }
+
+            // 4. 垂直拼接
+            // 需要 Wrapper 支持 Concat(DataFrameHandle[])
+            return Concat(rowFrames);
+        }
+        finally
+        {
+            // 清理中间产生的临时 DataFrames
+            foreach (var frame in rowFrames)
+            {
+                frame.Dispose();
+            }
+        }
+    }
+
+    private static bool IsNumeric(string dtype)
+    {
+        // 简单判断：i, u, f 开头
+        // 如 i32, i64, u32, f64
+        return dtype.StartsWith("i") || dtype.StartsWith("u") || dtype.StartsWith("f");
+    }
     // ==========================================
     // Display (Show)
     // ==========================================

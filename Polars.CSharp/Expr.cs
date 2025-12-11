@@ -378,7 +378,35 @@ public class Expr : IDisposable
         var e = PolarsWrapper.CloneExpr(Handle);
         return new Expr(PolarsWrapper.IsNotNull(e));
     }
+    // ==========================================
+    // Statistical Ops
+    // ==========================================
 
+    /// <summary>
+    /// Count the number of values in this expression.
+    /// </summary>
+    public Expr Count() => new Expr(PolarsWrapper.Count(Handle));
+
+    /// <summary>
+    /// Get the standard deviation.
+    /// </summary>
+    public Expr Std(int ddof = 1) => new Expr(PolarsWrapper.Std(Handle, ddof));
+
+    /// <summary>
+    /// Get the variance.
+    /// </summary>
+    public Expr Var(int ddof = 1) => new Expr(PolarsWrapper.Var(Handle, ddof));
+
+    /// <summary>
+    /// Get the median value.
+    /// </summary>
+    public Expr Median() => new Expr(PolarsWrapper.Median(Handle));
+
+    /// <summary>
+    /// Get the quantile value.
+    /// </summary>
+    public Expr Quantile(double quantile, string method = "nearest") 
+        => new Expr(PolarsWrapper.Quantile(CloneHandle(), quantile, method)); // CloneHandle 因为 Quantile 消耗 Expr
     // ==========================================
     // Logic / Comparison
     // ==========================================
