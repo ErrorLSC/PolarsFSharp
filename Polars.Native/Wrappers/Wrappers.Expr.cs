@@ -167,6 +167,18 @@ public static partial class PolarsWrapper
         e.TransferOwnership();
         return ErrorHelper.Check(h);
     }
+    // Statistics
+    public static ExprHandle Count(ExprHandle e) => UnaryOp(NativeBindings.pl_expr_count, e);
+    public static ExprHandle Std(ExprHandle e, int ddof) => ErrorHelper.Check(NativeBindings.pl_expr_std(e, (byte)ddof));
+    public static ExprHandle Var(ExprHandle e, int ddof) => ErrorHelper.Check(NativeBindings.pl_expr_var(e, (byte)ddof));
+    public static ExprHandle Median(ExprHandle e) => UnaryOp(NativeBindings.pl_expr_median, e);
+    
+    public static ExprHandle Quantile(ExprHandle e, double quantile, string method)
+    {
+        var h = NativeBindings.pl_expr_quantile(e, quantile, method);
+        e.TransferOwnership();
+        return ErrorHelper.Check(h);
+    }
     // IsBetween
     public static ExprHandle IsBetween(ExprHandle expr, ExprHandle lower, ExprHandle upper)
     {

@@ -172,7 +172,24 @@ type Expr(handle: ExprHandle) =
     /// <summary> Calculate the natural logarithm (base e). </summary>
     member this.Ln() = 
         this.Log Math.E
-
+    // Stats
+    /// <summary>
+    /// Count the number of valid (non-null) values.
+    /// </summary>
+    member this.Count() = new Expr(PolarsWrapper.Count handle)
+    member this.Std(?ddof: int) = 
+        let d = defaultArg ddof 1 // Default sample std dev
+        new Expr(PolarsWrapper.Std(handle, d))
+        
+    member this.Var(?ddof: int) = 
+        let d = defaultArg ddof 1
+        new Expr(PolarsWrapper.Var(handle, d))
+        
+    member this.Median() = new Expr(PolarsWrapper.Median handle)
+    
+    member this.Quantile(q: float, ?interpolation: string) =
+        let method = defaultArg interpolation "linear"
+        new Expr(PolarsWrapper.Quantile(this.CloneHandle(), q, method))
     // Logic
     /// <summary> Check if the value is between lower and upper bounds (inclusive). </summary>
     member this.IsBetween(lower: Expr, upper: Expr) =
@@ -558,7 +575,7 @@ type Series(handle: SeriesHandle) =
                 valid.[i] <- false
                 
         let s = new Series(PolarsWrapper.SeriesNew(name, nanos, valid))
-        s.Cast(DataType.Time)
+        s.Cast DataType.Time
 
     // --- TimeSpan (Polars Duration: i64 microseconds) ---
     // 为了和 Datetime(us) 兼容，Duration 也默认用 us

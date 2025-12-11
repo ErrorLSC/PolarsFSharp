@@ -444,6 +444,20 @@ unsafe internal partial class NativeBindings
     [LibraryImport(LibName,StringMarshalling = StringMarshalling.Utf8)] public static partial ExprHandle pl_expr_rolling_min_by(ExprHandle expr, string windowSize, ExprHandle by, string closed);
     [LibraryImport(LibName,StringMarshalling = StringMarshalling.Utf8)] public static partial ExprHandle pl_expr_rolling_max_by(ExprHandle expr, string windowSize, ExprHandle by, string closed);
     [LibraryImport(LibName)] public static partial ExprHandle pl_expr_if_else(ExprHandle pred, ExprHandle ifTrue, ExprHandle ifFalse);
+    // Statistical
+    [LibraryImport(LibName)]
+    public static partial ExprHandle pl_expr_count(ExprHandle e);
+    [LibraryImport(LibName)]
+    public static partial ExprHandle pl_expr_std(ExprHandle e, byte ddof);
+
+    [LibraryImport(LibName)]
+    public static partial ExprHandle pl_expr_var(ExprHandle e, byte ddof);
+
+    [LibraryImport(LibName)]
+    public static partial ExprHandle pl_expr_median(ExprHandle e);
+
+    [LibraryImport(LibName, StringMarshalling = StringMarshalling.Utf8)]
+    public static partial ExprHandle pl_expr_quantile(ExprHandle e, double quantile, string interpol);
     // --- Series Lifecycle ---
     [LibraryImport(LibName)]
     public static partial void pl_series_free(IntPtr ptr);

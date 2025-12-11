@@ -1,5 +1,5 @@
 use polars::prelude::*;
-use std::os::raw::c_char;
+use std::{ffi::CStr, os::raw::c_char};
 use crate::types::{ExprContext, consume_exprs_array, ptr_to_str};
 use std::ops::{Add, Sub, Mul, Div, Rem};
 use crate::datatypes::DataTypeContext;
@@ -766,4 +766,58 @@ pub extern "C" fn pl_expr_if_else(
         
         Ok(Box::into_raw(Box::new(ExprContext { inner: new_expr })))
     })
+}
+
+// --- Statistics ---
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_expr_count(expr_ptr: *mut ExprContext) -> *mut ExprContext {
+    let ctx = unsafe { &*expr_ptr };
+    let new_expr = ctx.inner.clone().count();
+    Box::into_raw(Box::new(ExprContext { inner: new_expr }))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_expr_std(expr_ptr: *mut ExprContext, ddof: u8) -> *mut ExprContext {
+    let ctx = unsafe { &*expr_ptr };
+    // std(ddof) -> ddof usually 1 for sample std dev
+    let new_expr = ctx.inner.clone().std(ddof);
+    Box::into_raw(Box::new(ExprContext { inner: new_expr }))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_expr_var(expr_ptr: *mut ExprContext, ddof: u8) -> *mut ExprContext {
+    let ctx = unsafe { &*expr_ptr };
+    let new_expr = ctx.inner.clone().var(ddof);
+    Box::into_raw(Box::new(ExprContext { inner: new_expr }))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_expr_median(expr_ptr: *mut ExprContext) -> *mut ExprContext {
+    let ctx = unsafe { &*expr_ptr };
+    let new_expr = ctx.inner.clone().median();
+    Box::into_raw(Box::new(ExprContext { inner: new_expr }))
+}
+
+// quantile(quantile, interpolation)
+// interpolation: "nearest", "higher", "lower", "midpoint", "linear"
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_expr_quantile(
+    expr_ptr: *mut ExprContext, 
+    quantile: f64, // e.g. 0.5
+    interpol: *const c_char
+) -> *mut ExprContext {
+    let ctx = unsafe { &*expr_ptr };
+    let method_str = unsafe { CStr::from_ptr(interpol).to_string_lossy() };
+    
+    // 解析 QuantileInterpolOptions
+    let method = match method_str.as_ref() {
+        "nearest" => QuantileMethod::Nearest,
+        "higher" => QuantileMethod::Higher,
+        "lower" => QuantileMethod::Lower,
+        "midpoint" => QuantileMethod::Midpoint,
+        _ => QuantileMethod::Linear, // 默认 Linear
+    };
+
+    let new_expr = ctx.inner.clone().quantile(lit(quantile), method);
+    Box::into_raw(Box::new(ExprContext { inner: new_expr }))
 }

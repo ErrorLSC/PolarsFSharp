@@ -313,6 +313,28 @@ type ``Basic Functionality Tests`` () =
         // 4. 验证原 DF 依然存活
         Assert.Equal(2L, df.Rows)
     [<Fact>]
+    member _.``EDA: Describe (Manual Implementation)`` () =
+        let s = Series.create("nums", [1.0; 2.0; 3.0; 4.0; 5.0])
+        use df = DataFrame.create([s])
+
+        let desc = df.Describe()
+        
+        Polars.show desc |> ignore
+        
+        // 验证行数 (9个指标)
+        Assert.Equal(9L, desc.Rows)
+        
+        // 验证 mean (第3行，第2列)
+        // 注意：我们每一行是一个单独的 Select，顺序由 metrics 列表决定
+        // 0: count, 1: null_count, 2: mean
+        let meanVal = desc.Float("nums", 2).Value
+        Assert.Equal(3.0, meanVal)
+        
+        // 验证 std
+        let stdVal = desc.Float("nums", 3).Value
+        // 1..5 的 std 是 1.5811...
+        Assert.True(abs(stdVal - 1.58113883) < 0.0001)
+    [<Fact>]
     member _.``Reshaping: Concat Diagonal`` () =
         // df1: [a, b]
         use csv1 = new TempCsv "a,b\n1,2"

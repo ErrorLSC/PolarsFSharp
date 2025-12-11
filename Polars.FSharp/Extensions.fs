@@ -237,7 +237,7 @@ module Serialization =
 
         // 返回闭包：处理 Null 和 类型转换
         fun (rowIndex: int) ->
-            if col.IsNull(rowIndex) then
+            if col.IsNull rowIndex then
                 if isOption then valueNone
                 else if not coreType.IsValueType then null // 引用类型允许 null
                 else failwithf "Column '%s' has null at row %d but record field '%s' is not Option" (col.GetType().Name) rowIndex targetType.Name
@@ -431,3 +431,55 @@ module Serialization =
                     |> Array.toList
 
                 DataFrame.create seriesList
+        member this.Describe() : DataFrame =
+            // 1. 筛选数值列 (Int/Float)
+            // 我们利用 Schema 来判断
+            let numericCols = 
+                this.Schema 
+                |> Map.filter (fun _ dtype -> 
+                    dtype.StartsWith("i") || dtype.StartsWith("f") || dtype.StartsWith("u")
+                )
+                |> Map.keys
+                |> Seq.toList
+
+            if numericCols.IsEmpty then
+                failwith "No numeric columns to describe."
+
+            // 2. 定义统计指标
+            // 每个指标生成一行数据
+            let metrics = [
+                "count",      fun (c: string) -> Polars.col(c).Count().Cast Float64
+                "null_count", fun c -> Polars.col(c).IsNull().Sum().Cast Float64
+                "mean",       fun c -> Polars.col(c).Mean()
+                "std",        fun c -> Polars.col(c).Std()
+                "min",        fun c -> Polars.col(c).Min().Cast Float64
+                "25%",        fun c -> Polars.col(c).Quantile 0.25
+                "50%",        fun c -> Polars.col(c).Median().Cast Float64 
+                "75%",        fun c -> Polars.col(c).Quantile 0.75
+                "max",        fun c -> Polars.col(c).Max().Cast Float64
+            ]
+
+            // 3. 构建聚合查询
+            // 结果将是:
+            // statistic | col1 | col2 ...
+            // count     | ...  | ...
+            // mean      | ...  | ...
+            
+            // 这里的策略是：先计算所有值，然后转置？
+            // 不，Polars 推荐的方式是：构建一个包含 "statistic" 列和其他列的 List of DataFrames，然后 Concat。
+            // 每一行（比如 mean）是一个小的 DataFrame：[statistic="mean", col1=mean1, col2=mean2...]
+            
+            let rowFrames = 
+                metrics 
+                |> List.map (fun (statName, op) ->
+                    // 构造 Select 列表: [ Lit(statName).Alias("statistic"), op(col1), op(col2)... ]
+                    let exprs = 
+                        [ Polars.lit(statName).Alias "statistic" ] @
+                        (numericCols |> List.map (fun c -> op c))
+                    
+                    // 对原 DF 执行 Select -> 得到 1 行 N 列的 DF
+                    this |> Polars.select exprs
+                )
+
+            // 4. 垂直拼接 (Concat Vertical)
+            Polars.concat rowFrames
