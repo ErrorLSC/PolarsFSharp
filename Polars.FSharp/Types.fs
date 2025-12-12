@@ -333,6 +333,47 @@ and DtOps(handle: ExprHandle) =
     member this.ToString() = 
         // 这是一个常见的 ISO 格式，或者你可以选择其他默认值
         this.ToString "%Y-%m-%dT%H:%M:%S%.f"
+    // --- Manipulation ---
+
+    /// <summary>
+    /// Truncate dates to the specified interval (e.g., "1d", "1h", "15m").
+    /// </summary>
+    member _.Truncate(every: string) = 
+        new Expr(PolarsWrapper.DtTruncate(handle, every))
+
+    /// <summary>
+    /// Round dates to the nearest interval.
+    /// </summary>
+    member _.Round(every: string) = 
+        new Expr(PolarsWrapper.DtRound(handle, every))
+
+    /// <summary>
+    /// Offset the date by a given duration string (e.g., "1d", "-2h").
+    /// </summary>
+    member _.OffsetBy(duration: string) =
+        // 自动创建 lit(duration)
+        let durExpr = PolarsWrapper.Lit(duration) // 假设 Lit(string) wrapper 存在
+        new Expr(PolarsWrapper.DtOffsetBy(handle, durExpr))
+
+    /// <summary>
+    /// Offset the date by a duration expression (dynamic offset).
+    /// </summary>
+    member _.OffsetBy(duration: Expr) =
+        new Expr(PolarsWrapper.DtOffsetBy(handle, duration.CloneHandle()))
+
+    // --- Conversion ---
+
+    /// <summary>
+    /// Convert to integer timestamp (Microseconds).
+    /// </summary>
+    member _.TimestampMicros() = 
+        new Expr(PolarsWrapper.DtTimestamp(handle, 1))
+
+    /// <summary>
+    /// Convert to integer timestamp (Milliseconds).
+    /// </summary>
+    member _.TimestampMillis() = 
+        new Expr(PolarsWrapper.DtTimestamp(handle, 2))
 
 and StringOps(handle: ExprHandle) =
     let wrap op = new Expr(op handle)

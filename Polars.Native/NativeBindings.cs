@@ -194,6 +194,19 @@ unsafe internal partial class NativeBindings
     
     [LibraryImport(LibName)] public static partial ExprHandle pl_expr_dt_date(ExprHandle expr);
     [LibraryImport(LibName)] public static partial ExprHandle pl_expr_dt_time(ExprHandle expr);
+
+    [LibraryImport(LibName, StringMarshalling = StringMarshalling.Utf8)]
+    public static partial ExprHandle pl_expr_dt_truncate(ExprHandle e, string every);
+
+    [LibraryImport(LibName, StringMarshalling = StringMarshalling.Utf8)]
+    public static partial ExprHandle pl_expr_dt_round(ExprHandle e, string every);
+
+    [LibraryImport(LibName)]
+    public static partial ExprHandle pl_expr_dt_offset_by(ExprHandle e, ExprHandle by);
+
+    [LibraryImport(LibName)]
+    public static partial ExprHandle pl_expr_dt_timestamp(ExprHandle e, int unitCode);
+
     [LibraryImport(LibName)]
     public static partial ExprHandle pl_expr_clone(ExprHandle expr);
 

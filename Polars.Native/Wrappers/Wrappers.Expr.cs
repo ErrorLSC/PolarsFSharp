@@ -102,6 +102,24 @@ public static partial class PolarsWrapper
 
     public static ExprHandle DtDate(ExprHandle e) => UnaryDtOp(NativeBindings.pl_expr_dt_date, e);
     public static ExprHandle DtTime(ExprHandle e) => UnaryDtOp(NativeBindings.pl_expr_dt_time, e);
+    // Truncate / Round (Expr + String)
+    public static ExprHandle DtTruncate(ExprHandle e, string every) 
+        => UnaryStrOp(NativeBindings.pl_expr_dt_truncate, e, every); // 注意这里用 UnaryStrOp
+
+    public static ExprHandle DtRound(ExprHandle e, string every)
+        => UnaryStrOp(NativeBindings.pl_expr_dt_round, e, every);
+
+    // OffsetBy (Expr + Expr)
+    public static ExprHandle DtOffsetBy(ExprHandle e, ExprHandle by)
+        => BinaryOp(NativeBindings.pl_expr_dt_offset_by, e, by);
+
+    // Timestamp (Expr + Int)
+    public static ExprHandle DtTimestamp(ExprHandle e, int unitCode)
+    {
+        var h = NativeBindings.pl_expr_dt_timestamp(e, unitCode);
+        e.TransferOwnership();
+        return ErrorHelper.Check(h);
+    }
     // String Ops
     public static ExprHandle StrContains(ExprHandle e, string pat) 
     {

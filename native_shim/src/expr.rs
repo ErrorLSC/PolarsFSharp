@@ -534,7 +534,7 @@ pub extern "C" fn pl_expr_clone(ptr: *mut ExprContext) -> *mut ExprContext {
     Box::into_raw(Box::new(ExprContext { inner: new_expr }))
 }
 // ==========================================
-// Date Ops
+// Temporal Ops
 // ==========================================
 #[unsafe(no_mangle)]
 pub extern "C" fn pl_expr_dt_to_string(
@@ -548,6 +548,65 @@ pub extern "C" fn pl_expr_dt_to_string(
         // Polars API: dt().to_string(format)
         let new_expr = ctx.inner.dt().to_string(format);
         
+        Ok(Box::into_raw(Box::new(ExprContext { inner: new_expr })))
+    })
+}
+
+// Truncate (Floor)
+// every: e.g. "1h", "1d"
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_expr_dt_truncate(expr_ptr: *mut ExprContext, every: *const c_char) -> *mut ExprContext {
+    ffi_try!({
+        let ctx = unsafe { Box::from_raw(expr_ptr) }; // Move
+        let every_str = unsafe { CStr::from_ptr(every).to_string_lossy() };
+        
+        // dt().truncate(every)
+        let new_expr = ctx.inner.dt().truncate(lit(every_str.as_ref()));
+        
+        Ok(Box::into_raw(Box::new(ExprContext { inner: new_expr })))
+    })
+}
+
+// Round
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_expr_dt_round(expr_ptr: *mut ExprContext, every: *const c_char) -> *mut ExprContext {
+    ffi_try!({
+        let ctx = unsafe { Box::from_raw(expr_ptr) };
+        let every_str = unsafe { CStr::from_ptr(every).to_string_lossy() };
+        
+        let new_expr = ctx.inner.dt().round(lit(every_str.as_ref()));
+        Ok(Box::into_raw(Box::new(ExprContext { inner: new_expr })))
+    })
+}
+
+// Offset By (Add Duration)
+// by: Duration Expr (e.g. lit("1d") or col("duration"))
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_expr_dt_offset_by(expr_ptr: *mut ExprContext, by_ptr: *mut ExprContext) -> *mut ExprContext {
+    ffi_try!({
+        let ctx = unsafe { Box::from_raw(expr_ptr) };
+        let by_ctx = unsafe { Box::from_raw(by_ptr) };
+        
+        // dt().offset_by(expr)
+        let new_expr = ctx.inner.dt().offset_by(by_ctx.inner);
+        Ok(Box::into_raw(Box::new(ExprContext { inner: new_expr })))
+    })
+}
+
+// Timestamp (to Int64)
+// unit: 0=ns, 1=us, 2=ms
+#[unsafe(no_mangle)]
+pub extern "C" fn pl_expr_dt_timestamp(expr_ptr: *mut ExprContext, unit_code: i32) -> *mut ExprContext {
+    ffi_try!({
+        let ctx = unsafe { Box::from_raw(expr_ptr) };
+        let unit = match unit_code {
+            0 => TimeUnit::Nanoseconds,
+            1 => TimeUnit::Microseconds,
+            2 => TimeUnit::Milliseconds,
+            _ => TimeUnit::Microseconds,
+        };
+        
+        let new_expr = ctx.inner.dt().timestamp(unit);
         Ok(Box::into_raw(Box::new(ExprContext { inner: new_expr })))
     })
 }
