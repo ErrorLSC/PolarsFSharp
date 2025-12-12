@@ -474,4 +474,77 @@ TooShort,1990-05-20,1.60";
         Assert.Equal("x", res.GetValue<string>(0, "flat"));
         Assert.Equal("y", res.GetValue<string>(1, "flat"));
     }
+    [Fact]
+    public void Test_String_Strip_And_Checks()
+    {
+        // 构造测试数据
+        // "  hello  " (用于测试 strip whitespace)
+        // "__world__" (用于测试 strip chars)
+        // "prefix_val_suffix" (用于测试 strip prefix/suffix)
+        using var s = new Series("s", ["  hello  ", "__world__", "prefix_val_suffix"]);
+        using var df = new DataFrame(s);
+
+        using var res = df.Select(
+            // 1. Strip Whitespace (默认)
+            Col("s").Str.StripChars().Alias("strip_ws"), 
+            
+            // 2. Strip Specific Chars ('_')
+            Col("s").Str.StripChars("_").Alias("strip_custom"),
+
+            // 3. Strip Start/End
+            Col("s").Str.StripCharsStart(" _").Alias("strip_start"), // 去除开头的空格或下划线
+            
+            // 4. Strip Prefix/Suffix
+            Col("s").Str.StripPrefix("prefix_").Str.StripSuffix("_suffix").Alias("strip_affix"),
+
+            // 5. StartsWith / EndsWith
+            Col("s").Str.StartsWith("  h").Alias("starts_h"),
+            Col("s").Str.EndsWith("__").Alias("ends_underscore")
+        );
+
+        // 验证 Strip WS ("  hello  " -> "hello")
+        Assert.Equal("hello", res.GetValue<string>(0, "strip_ws"));
+        
+        // 验证 Strip Custom ("__world__" -> "world")
+        Assert.Equal("world", res.GetValue<string>(1, "strip_custom"));
+
+        // 验证 Strip Start ("  hello  " -> "hello  ", "__world__" -> "world__")
+        Assert.Equal("hello  ", res.GetValue<string>(0, "strip_start"));
+        Assert.Equal("world__", res.GetValue<string>(1, "strip_start"));
+
+        // 验证 Strip Affix ("prefix_val_suffix" -> "val")
+        Assert.Equal("val", res.GetValue<string>(2, "strip_affix"));
+
+        // 验证 Boolean Checks
+        Assert.True(res.GetValue<bool>(0, "starts_h"));     // "  hello  " starts with "  h"
+        Assert.True(res.GetValue<bool>(1, "ends_underscore")); // "__world__" ends with "__"
+    }
+
+    [Fact]
+    public void Test_String_To_Date_Parsing()
+    {
+        using var s = new Series("dates", ["2023-01-01", "2023/12/31"]);
+        using var df = new DataFrame(s);
+
+        // 测试 ToDate 和 ToDatetime
+        // 注意：Wrapper 里的 ToDate/ToDatetime 是严格模式，需要格式匹配
+        using var res = df.Select(
+            Col("dates").Str.ToDate("%Y-%m-%d").Alias("parsed_date"),       // Row 0 匹配
+            Col("dates").Str.ToDatetime("%Y/%m/%d").Alias("parsed_dt")      // Row 1 匹配
+        );
+        
+        // 验证 Row 0: 2023-01-01
+        // Schema 验证 (现在可以用 Kind 了!)
+        Assert.Equal(DataTypeKind.Date, res.Schema["parsed_date"].Kind);
+        
+        // 解析成功的应该有值
+        // Row 0 格式是 Y-m-d，所以 parsed_date 有值
+        Assert.NotNull(res.GetValue<DateTime?>(0, "parsed_date")); // 或者 DateOnly
+        // Row 0 格式不匹配 Y/m/d，解析失败应该变成 null (Polars 默认行为是 strict=false 还是 null? 通常是 null)
+        Assert.Null(res.GetValue<DateTime?>(0, "parsed_dt"));
+
+        // 验证 Row 1: 2023/12/31
+        // 格式是 Y/m/d，所以 parsed_dt 有值
+        Assert.NotNull(res.GetValue<DateTime?>(1, "parsed_dt"));
+    }
 }

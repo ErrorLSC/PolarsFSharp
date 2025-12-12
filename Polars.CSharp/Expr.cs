@@ -815,6 +815,93 @@ public class StringOps
          var h = PolarsWrapper.CloneExpr(_expr.Handle);
          return new Expr(PolarsWrapper.StrSplit(h, separator));
     }
+    // ==========================================
+    // Strip / Clean (去除字符)
+    // ==========================================
+
+    /// <summary>
+    /// Remove leading and trailing characters.
+    /// If matches is null, whitespace is removed.
+    /// </summary>
+    /// <param name="matches">The set of characters to be removed.</param>
+    public Expr StripChars(string? matches = null)
+    {
+        return new Expr(PolarsWrapper.StrStripChars(_expr.Handle, matches));
+    }
+
+    /// <summary>
+    /// Remove leading characters.
+    /// If matches is null, whitespace is removed.
+    /// </summary>
+    public Expr StripCharsStart(string? matches = null)
+    {
+        return new Expr(PolarsWrapper.StrStripCharsStart(_expr.Handle, matches));
+    }
+
+    /// <summary>
+    /// Remove trailing characters.
+    /// If matches is null, whitespace is removed.
+    /// </summary>
+    public Expr StripCharsEnd(string? matches = null)
+    {
+        return new Expr(PolarsWrapper.StrStripCharsEnd(_expr.Handle, matches));
+    }
+
+    /// <summary>
+    /// Remove a specific prefix string.
+    /// </summary>
+    public Expr StripPrefix(string prefix)
+    {
+        return new Expr(PolarsWrapper.StrStripPrefix(_expr.Handle, prefix));
+    }
+
+    /// <summary>
+    /// Remove a specific suffix string.
+    /// </summary>
+    public Expr StripSuffix(string suffix)
+    {
+        return new Expr(PolarsWrapper.StrStripSuffix(_expr.Handle, suffix));
+    }
+
+    // ==========================================
+    // Boolean Checks (检查)
+    // ==========================================
+
+    /// <summary>
+    /// Check if the string starts with the given prefix.
+    /// </summary>
+    public Expr StartsWith(string prefix)
+    {
+        return new Expr(PolarsWrapper.StrStartsWith(_expr.Handle, prefix));
+    }
+
+    /// <summary>
+    /// Check if the string ends with the given suffix.
+    /// </summary>
+    public Expr EndsWith(string suffix)
+    {
+        return new Expr(PolarsWrapper.StrEndsWith(_expr.Handle, suffix));
+    }
+
+    // ==========================================
+    // Temporal Parsing (日期转换)
+    // ==========================================
+
+    /// <summary>
+    /// Convert string to Date using the specified format.
+    /// </summary>
+    public Expr ToDate(string format)
+    {
+        return new Expr(PolarsWrapper.StrToDate(_expr.Handle, format));
+    }
+
+    /// <summary>
+    /// Convert string to Datetime using the specified format.
+    /// </summary>
+    public Expr ToDatetime(string format)
+    {
+        return new Expr(PolarsWrapper.StrToDatetime(_expr.Handle, format));
+    }
 }
 
 // ==========================================
