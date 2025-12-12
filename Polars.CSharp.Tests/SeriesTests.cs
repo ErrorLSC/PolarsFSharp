@@ -80,4 +80,79 @@ public class SeriesTests
         using var sClean = new Series("clean", [1, 2, 3]);
         Assert.Equal(0, sClean.NullCount);
     }
+    [Fact]
+    public void Test_Series_Arithmetic()
+    {
+        using var s1 = new Series("a", [1, 2, 3]);
+        using var s2 = new Series("b", [10, 20, 30]);
+
+        // Test Add (+)
+        using var sum = s1 + s2;
+        Assert.Equal(11, sum.GetValue<int>(0));
+        Assert.Equal(22, sum.GetValue<int>(1));
+        Assert.Equal(33, sum.GetValue<int>(2));
+
+        // Test Mul (*)
+        using var prod = s1 * s2;
+        Assert.Equal(10, prod.GetValue<int>(0));
+        Assert.Equal(90, prod.GetValue<int>(2)); // 3 * 30
+    }
+
+    [Fact]
+    public void Test_Series_Comparison()
+    {
+        using var s1 = new Series("a", [1, 5, 10]);
+        using var s2 = new Series("b", [1, 4, 20]);
+
+        // Test Eq (1==1, 5!=4, 10!=20) -> [true, false, false]
+        using var eq = s1.Eq(s2);
+        Assert.True(eq.GetValue<bool>(0));
+        Assert.False(eq.GetValue<bool>(1));
+
+        // Test Gt (>) (1>1 false, 5>4 true, 10>20 false)
+        using var gt = s1 > s2;
+        Assert.False(gt.GetValue<bool>(0));
+        Assert.True(gt.GetValue<bool>(1));
+        Assert.False(gt.GetValue<bool>(2));
+    }
+
+    [Fact]
+    public void Test_Series_Aggregations()
+    {
+        using var s = new Series("nums", [1, 2, 3, 4, 5]);
+
+        // Sum: 15
+        using var sumSeries = s.Sum();
+        Assert.Equal(1, sumSeries.Length); // 聚合后长度为 1
+        Assert.Equal(15, sumSeries.GetValue<int>(0));
+        
+        // 验证泛型快捷方法
+        Assert.Equal(15, s.Sum<int>());
+
+        // Mean: 3.0
+        // 注意：Mean 可能会返回 double，具体取决于 Polars 内部实现，通常是 float64
+        Assert.Equal(3.0, s.Mean<double>());
+        
+        // Min/Max
+        Assert.Equal(1, s.Min<int>());
+        Assert.Equal(5, s.Max<int>());
+    }
+
+    [Fact]
+    public void Test_Series_FloatChecks()
+    {
+        // 构造包含 NaN 和 Inf 的 Series
+        // C# double.NaN 对应 Polars Float64 NaN
+        using var s = new Series("f", [1.0, double.NaN, double.PositiveInfinity]);
+
+        // IsNan -> [false, true, false]
+        using var isNan = s.IsNan();
+        Assert.False(isNan.GetValue<bool>(0));
+        Assert.True(isNan.GetValue<bool>(1));
+        Assert.False(isNan.GetValue<bool>(2));
+
+        // IsInfinite -> [false, false, true]
+        using var isInf = s.IsInfinite();
+        Assert.True(isInf.GetValue<bool>(2));
+    }
 }

@@ -141,6 +141,181 @@ public class Series : IDisposable
         }
     }
     // ==========================================
+    // Arithmetic Operators (算术运算符)
+    // ==========================================
+    /// <summary>
+    /// Add Series
+    /// </summary>
+    /// <param name="left"></param>
+    /// <param name="right"></param>
+    /// <returns></returns>
+    public static Series operator +(Series left, Series right)
+    {
+        return new Series(PolarsWrapper.SeriesAdd(left.Handle, right.Handle));
+    }
+    /// <summary>
+    /// Minus Series
+    /// </summary>
+    /// <param name="left"></param>
+    /// <param name="right"></param>
+    /// <returns></returns>
+    public static Series operator -(Series left, Series right)
+    {
+        return new Series(PolarsWrapper.SeriesSub(left.Handle, right.Handle));
+    }
+    /// <summary>
+    /// Multiple Series
+    /// </summary>
+    /// <param name="left"></param>
+    /// <param name="right"></param>
+    /// <returns></returns>
+    public static Series operator *(Series left, Series right)
+    {
+        return new Series(PolarsWrapper.SeriesMul(left.Handle, right.Handle));
+    }
+    /// <summary>
+    /// Divide Series
+    /// </summary>
+    /// <param name="left"></param>
+    /// <param name="right"></param>
+    /// <returns></returns>
+    public static Series operator /(Series left, Series right)
+    {
+        return new Series(PolarsWrapper.SeriesDiv(left.Handle, right.Handle));
+    }
+
+    // ==========================================
+    // Comparison Methods & Operators (比较)
+    // ==========================================
+
+    // C# 的 == 和 != 运算符重载有比较严格的限制（通常用于对象相等性），
+    // 且必须成对重载并重写 Equals/GetHashCode。
+    // 为了避免混淆（是比较引用还是生成布尔掩码？），我们推荐使用显式的 Eq/Neq 方法，
+    // 或者在未来实现复杂的运算符重载策略。目前先暴露方法。
+    /// <summary>
+    /// Compare whether two Series is equal
+    /// </summary>
+    /// <param name="other"></param>
+    /// <returns></returns>
+    public Series Eq(Series other) => new Series(PolarsWrapper.SeriesEq(Handle, other.Handle));
+    /// <summary>
+    /// Compare whether two Series is not equal
+    /// </summary>
+    /// <param name="other"></param>
+    /// <returns></returns>
+    public Series Neq(Series other) => new Series(PolarsWrapper.SeriesNeq(Handle, other.Handle));
+    /// <summary>
+    /// Compare whether left series is greater than right series
+    /// </summary>
+    /// <param name="left"></param>
+    /// <param name="right"></param>
+    /// <returns></returns>
+    // 大于小于可以用运算符重载，这在 C# 中比较常见用于自定义类型
+    public static Series operator >(Series left, Series right) 
+        => new Series(PolarsWrapper.SeriesGt(left.Handle, right.Handle));
+    /// <summary>
+    /// Compare whether left series is less than right series
+    /// </summary>
+    /// <param name="left"></param>
+    /// <param name="right"></param>
+    /// <returns></returns>
+    public static Series operator <(Series left, Series right) 
+        => new Series(PolarsWrapper.SeriesLt(left.Handle, right.Handle));
+    /// <summary>
+    /// Compare whether left series is greater than or equal to right series
+    /// </summary>
+    /// <param name="left"></param>
+    /// <param name="right"></param>
+    /// <returns></returns>
+    public static Series operator >=(Series left, Series right) 
+        => new Series(PolarsWrapper.SeriesGtEq(left.Handle, right.Handle));
+    /// <summary>
+    /// Compare whether left series is less than or equal to right series
+    /// </summary>
+    /// <param name="left"></param>
+    /// <param name="right"></param>
+    /// <returns></returns>
+    public static Series operator <=(Series left, Series right) 
+        => new Series(PolarsWrapper.SeriesLtEq(left.Handle, right.Handle));
+
+    // 显式方法别名 (Fluent API 风格)
+    /// <summary>
+    /// Compare whether left series is greater than right series
+    /// </summary>
+    /// <param name="other"></param>
+    /// <returns></returns>
+    public Series Gt(Series other) => this > other;
+    /// <summary>
+    /// Compare whether left series is less than right series
+    /// </summary>
+    /// <param name="other"></param>
+    /// <returns></returns>
+    public Series Lt(Series other) => this < other;
+    /// <summary>
+    /// Compare whether left series is greater than or equal to right series
+    /// </summary>
+    /// <param name="other"></param>
+    /// <returns></returns>
+    public Series GtEq(Series other) => this >= other;
+    /// <summary>
+    /// Compare whether left series is less than or equal to right series
+    /// </summary>
+    /// <param name="other"></param>
+    /// <returns></returns>
+    public Series LtEq(Series other) => this <= other;
+
+    // ==========================================
+    // Aggregations (聚合)
+    // ==========================================
+
+    // 注意：Polars 的 Series 聚合通常返回一个长度为 1 的新 Series (Scalar)
+    /// <summary>
+    /// Sum series into 1 length series(Scalar)
+    /// </summary>
+    /// <returns></returns>
+    public Series Sum() => new Series(PolarsWrapper.SeriesSum(Handle));
+    /// <summary>
+    /// Mean series into 1 length series(Scalar)
+    /// </summary>
+    /// <returns></returns>
+    public Series Mean() => new Series(PolarsWrapper.SeriesMean(Handle));
+    /// <summary>
+    /// Min series into 1 length series(Scalar)
+    /// </summary>
+    /// <returns></returns>
+    public Series Min() => new Series(PolarsWrapper.SeriesMin(Handle));
+    /// <summary>
+    /// Max series into 1 length series(Scalar)
+    /// </summary>
+    /// <returns></returns>
+    public Series Max() => new Series(PolarsWrapper.SeriesMax(Handle));
+
+    // 泛型辅助方法：直接获取标量值
+    /// <summary>
+    /// Sum series into scalar
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <returns></returns>
+    public T? Sum<T>() => Sum().GetValue<T>(0);
+    /// <summary>
+    /// Mean series into scalar
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <returns></returns>
+    public T? Mean<T>() => Mean().GetValue<T>(0);
+    /// <summary>
+    /// Min series into scalar
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <returns></returns>
+    public T? Min<T>() => Min().GetValue<T>(0);
+    /// <summary>
+    /// Max series into scalar
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <returns></returns>
+    public T? Max<T>() => Max().GetValue<T>(0);
+    // ==========================================
     // Helpers (时间转换逻辑)
     // ==========================================
     
@@ -666,6 +841,29 @@ public class Series : IDisposable
         var newHandle = PolarsWrapper.SeriesIsNotNull(Handle);
         return new Series(newHandle);
     }
+    // ==========================================
+    // Float Checks (数值检查)
+    // ==========================================
+    /// <summary>
+    /// Check whether this series is NaN
+    /// </summary>
+    /// <returns></returns>
+    public Series IsNan() => new Series(PolarsWrapper.SeriesIsNan(Handle));
+    /// <summary>
+    /// Check whether this series is not NaN
+    /// </summary>
+    /// <returns></returns>
+    public Series IsNotNan() => new Series(PolarsWrapper.SeriesIsNotNan(Handle));
+    /// <summary>
+    /// Check whether this series is finite
+    /// </summary>
+    /// <returns></returns>
+    public Series IsFinite() => new Series(PolarsWrapper.SeriesIsFinite(Handle));
+    /// <summary>
+    /// Check whether this series is infinite
+    /// </summary>
+    /// <returns></returns>
+    public Series IsInfinite() => new Series(PolarsWrapper.SeriesIsInfinite(Handle));
     // ==========================================
     // Conversions (Arrow / DataFrame)
     // ==========================================
