@@ -20,15 +20,31 @@ public class LazyFrame : IDisposable
     // 工厂方法 (Scan IO)
     // ==========================================
     /// <summary>
-    /// Read a CSV file as a LazyFrame.
+    /// Scans a CSV file lazily.
     /// </summary>
-    /// <param name="path"></param>
-    /// <param name="tryParseDates"></param>
-    /// <returns></returns>
-    public static LazyFrame ScanCsv(string path, bool tryParseDates = true)
+    public static LazyFrame ScanCsv(
+        string path,
+        Dictionary<string, DataType>? schema = null,
+        bool hasHeader = true,
+        char separator = ',',
+        ulong skipRows = 0,
+        bool tryParseDates = true) // [新增参数]
     {
-        //
-        return new LazyFrame(PolarsWrapper.ScanCsv(path, tryParseDates));
+        var schemaHandles = schema?.ToDictionary(
+            kv => kv.Key, 
+            kv => kv.Value.Handle
+        );
+
+        var handle = PolarsWrapper.ScanCsv(
+            path, 
+            schemaHandles, 
+            hasHeader, 
+            separator, 
+            skipRows,
+            tryParseDates // 传递给 Wrapper
+        );
+
+        return new LazyFrame(handle);
     }
     /// <summary>
     /// Read a Parquet file as a LazyFrame.

@@ -25,8 +25,17 @@ unsafe internal partial class NativeBindings
     [LibraryImport(LibName)] public static partial void pl_expr_free(IntPtr ptr);
     [LibraryImport(LibName)] public static partial void pl_lazy_frame_free(IntPtr ptr);
     [LibraryImport(LibName)] public static partial void pl_selector_free(IntPtr ptr);
-    [LibraryImport(LibName, StringMarshalling = StringMarshalling.Utf8)] 
-    public static partial DataFrameHandle pl_read_csv(string path,[MarshalAs(UnmanagedType.U1)] bool tryParseDates);
+    [LibraryImport(LibName, StringMarshalling = StringMarshalling.Utf8)]
+    public static partial DataFrameHandle pl_read_csv(
+        string path,
+        IntPtr[]? schemaNames,    // Schema Keys
+        IntPtr[]? schemaTypes,    // Schema Values (DataTypeContext*)
+        UIntPtr schemaLen,
+        [MarshalAs(UnmanagedType.I1)] bool hasHeader,
+        byte separator,
+        UIntPtr skipRows,
+        [MarshalAs(UnmanagedType.I1)] bool tryParseDates // [新增]
+    );
     [LibraryImport(LibName)]
     public static partial void pl_dataframe_free(IntPtr ptr);
     // String Free
@@ -246,8 +255,17 @@ unsafe internal partial class NativeBindings
     [LibraryImport(LibName, StringMarshalling = StringMarshalling.Utf8)] 
     public static partial LazyFrameHandle pl_scan_ndjson(string path);
     // Lazy
+    // [IO: CSV Scan (Lazy)]
     [LibraryImport(LibName, StringMarshalling = StringMarshalling.Utf8)]
-    public static partial LazyFrameHandle pl_scan_csv(string path,[MarshalAs(UnmanagedType.U1)] bool tryParseDates
+    public static partial LazyFrameHandle pl_scan_csv(
+        string path,
+        IntPtr[]? schemaNames,
+        IntPtr[]? schemaTypes,
+        UIntPtr schemaLen,
+        [MarshalAs(UnmanagedType.I1)] bool hasHeader,
+        byte separator,
+        UIntPtr skipRows,
+        [MarshalAs(UnmanagedType.I1)] bool tryParseDates // [新增]
     );
 
     [LibraryImport(LibName)] 

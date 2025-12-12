@@ -61,15 +61,15 @@ type ``Series Tests`` () =
     member _.``Interop: DataFrame <-> Series`` () =
         // 1. 创建 DataFrame
         use csv = new TempCsv "name,age\nalice,10\nbob,20"
-        let df = Polars.readCsv csv.Path None
-        
+        let df = DataFrame.readCsv csv.Path
+                
         // 2. 获取 Series (ByName)
         use sName = df.Column "name"
         Assert.Equal("name", sName.Name)
         Assert.Equal(2L, sName.Length)
         sName |> Polars.showSeries |> ignore
         // 3. 获取 Series (ByIndex)
-        use sAge = df.Column(1)
+        use sAge = df.Column 1
         Assert.Equal("age", sAge.Name)
 
         // 4. 索引器语法

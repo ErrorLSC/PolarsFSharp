@@ -16,16 +16,41 @@ type ``Basic Functionality Tests`` () =
     member _.``Can read CSV and count rows/cols`` () =
         use csv = new TempCsv "name,age,birthday\nAlice,30,2022-11-01\nBob,25,2025-12-03"
         
-        let df = Polars.readCsv csv.Path None
+        let df = DataFrame.readCsv (path=csv.Path)
         
         Assert.Equal(2L, df.Rows)    // 注意：现在 Rows 返回的是 long (int64)
         Assert.Equal(3L, df.Columns) // 注意：现在 Columns 返回的是 long
+    [<Fact>]
+    member _.``IO: Advanced CSV Reading (Schema, Skip, Dates)`` () =
+        let path = "advanced_test.csv"
+        try
+            let content = """IGNORE_THIS_LINE
+id;date_col;val_col
+007;2023-01-01;99.9
+008;2023-12-31;10.5"""
+            System.IO.File.WriteAllText(path, content)
 
+            // [修改] 调用 DataFrame.readCsv
+            use df = DataFrame.readCsv(
+                path,
+                skipRows = 1,
+                separator = ';',
+                tryParseDates = true,
+                schema = Map [("id", DataType.String)]
+            )
+
+            Assert.Equal(2L, df.Rows)
+            Assert.Equal("str", df.Column("id").DtypeStr)
+            Assert.Equal("007", df.String("id", 0).Value)
+            Assert.Equal(99.9, df.Float("val_col", 0).Value)
+
+        finally
+            if System.IO.File.Exists path then System.IO.File.Delete path
     [<Fact>]
     member _.``Can read&write Parquet`` () =
         // 这一步需要你有一个真实的 parquet 文件，或者先用 writeParquet 生成一个
         use csv = new TempCsv "a,b\n1,2"
-        let df = Polars.readCsv csv.Path None
+        let df = DataFrame.readCsv (path=csv.Path, tryParseDates=false)
         
         let tmpParquet = System.IO.Path.GetTempFileName()
         try
@@ -66,15 +91,15 @@ type ``Basic Functionality Tests`` () =
 
         finally
             // 清理垃圾
-            if System.IO.File.Exists(pathIpc) then System.IO.File.Delete pathIpc
-            if System.IO.File.Exists(pathJson) then System.IO.File.Delete pathJson
+            if System.IO.File.Exists pathIpc then System.IO.File.Delete pathIpc
+            if System.IO.File.Exists pathJson then System.IO.File.Delete pathJson
     [<Fact>]
     member _.``Streaming, Sink(untested)`` () =
         // 1. 准备宽表数据 (Sales Data)
         // Year, Q1, Q2
         use csv = new TempCsv "year,Q1,Q2\n2023,100,200\n2024,300,400"
 
-        let lf = Polars.scanCsv csv.Path None
+        let lf = LazyFrame.scanCsv (path=csv.Path, tryParseDates=false)
         let tmpParquet = System.IO.Path.GetTempFileName()
         System.IO.File.Delete tmpParquet
 
@@ -123,7 +148,7 @@ type ``Basic Functionality Tests`` () =
     [<Fact>]
     member _.``Lazy Introspection: Schema and Explain`` () =
         use csv = new TempCsv "a,b\n1,2"
-        let lf = Polars.scanCsv csv.Path None
+        let lf = LazyFrame.scanCsv (path=csv.Path, tryParseDates=false)
         
         let lf2 = 
             lf 
@@ -183,7 +208,7 @@ type ``Basic Functionality Tests`` () =
     member _.``Materialization: DataFrame to Records`` () =
         let csv = "name,age,score,joined\nAlice,30,99.5,2023-01-01\nBob,25,,\n"
         use tmp = new TempCsv(csv)
-        let df = Polars.readCsv tmp.Path (Some true)
+        let df = DataFrame.readCsv (path=tmp.Path, tryParseDates=true)
 
         let records = df.ToRecords<UserRecord>()
 
@@ -374,8 +399,8 @@ type ``Basic Functionality Tests`` () =
         // df2: [a, c] (注意：没有 b，多了 c)
         use csv2 = new TempCsv "a,c\n3,4"
 
-        let df1 = Polars.readCsv csv1.Path None
-        let df2 = Polars.readCsv csv2.Path None
+        let df1 = DataFrame.readCsv (path=csv1.Path, tryParseDates=false)
+        let df2 = DataFrame.readCsv (path=csv2.Path, tryParseDates=false)
 
         // 对角拼接
         // 结果应该包含 3 列: [a, b, c]
@@ -436,7 +461,7 @@ type ``Basic Functionality Tests`` () =
         // 构造一个稍微大一点的计算任务
         use csv1 = new TempCsv "a,b\n1,2\n3,4"
         let df = 
-            Polars.scanCsv csv1.Path None
+            LazyFrame.scanCsv (path=csv1.Path, tryParseDates=false)
             |> Polars.filterLazy (Polars.col "a" .> Polars.lit 0)
             |> Polars.collectAsync // 返回 Async<DataFrame>
             |> Async.RunSynchronously // 在测试里阻塞等待结果

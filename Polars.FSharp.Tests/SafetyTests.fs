@@ -9,7 +9,7 @@ type ``Safety Tests`` () =
     [<Fact>]
     member _.``Throws Exception on invalid column name`` () =
         use csv = new TempCsv("a,b\n1,2")
-        let df = Polars.readCsv csv.Path None
+        let df = DataFrame.readCsv csv.Path
         
         let ex = Assert.Throws<Exception>(fun () -> 
             df 

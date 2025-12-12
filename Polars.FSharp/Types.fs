@@ -3,6 +3,7 @@ namespace Polars.FSharp
 open System
 open Polars.Native
 open Apache.Arrow
+open System.Collections.Generic
 /// <summary>
 /// Polars data types for casting and schema definitions.
 /// </summary>
@@ -834,6 +835,68 @@ and DataFrame(handle: DataFrameHandle) =
     member this.Clone() = new DataFrame(PolarsWrapper.CloneDataFrame handle)
     member internal this.CloneHandle() = PolarsWrapper.CloneDataFrame handle
     member _.Handle = handle
+    static member readCsv (path: string, 
+                               ?schema: Map<string, DataType>, // 注意逗号
+                               ?hasHeader: bool,               // 注意逗号
+                               ?separator: char,
+                               ?skipRows: int,
+                               ?tryParseDates: bool) : DataFrame =
+        
+        let header = defaultArg hasHeader true
+        let sep = defaultArg separator ','
+        let skip = defaultArg skipRows 0
+        let dates = defaultArg tryParseDates true
+        
+        let schemaDict = 
+            match schema with
+            | Some m -> 
+                let d = Dictionary<string, DataTypeHandle>()
+                m |> Map.iter (fun k v -> d.Add(k, v.CreateHandle()))
+                d
+            | None -> null
+
+        let h = PolarsWrapper.ReadCsv(path, schemaDict, header, sep, uint64 skip, dates)
+        new DataFrame(h)
+    /// <summary> Asynchronously read a CSV file into a DataFrame. </summary>
+    static member readCsvAsync(path: string, 
+                               ?schema: Map<string, DataType>,
+                               ?hasHeader: bool,
+                               ?separator: char,
+                               ?skipRows: int,
+                               ?tryParseDates: bool) : Async<DataFrame> =
+        
+        // 1. 在主线程准备参数 (参数解析是非常快的)
+        let header = defaultArg hasHeader true
+        let sep = defaultArg separator ','
+        let skip = defaultArg skipRows 0
+        let dates = defaultArg tryParseDates true
+        
+        // 2. 转换 Schema (Map -> Dictionary)
+        let schemaDict = 
+            match schema with
+            | Some m -> 
+                let d = Dictionary<string, DataTypeHandle>()
+                // 记得使用 CreateHandle()
+                m |> Map.iter (fun k v -> d.Add(k, v.CreateHandle()))
+                d
+            | None -> null
+
+        // 3. 进入 Async 工作流
+        async {
+            // 调用 C# Wrapper 的 Async 方法 (返回 Task<DataFrameHandle>)
+            // 使用 Async.AwaitTask 等待 C# Task 完成
+            let! handle = 
+                PolarsWrapper.ReadCsvAsync(
+                    path, 
+                    schemaDict, 
+                    header, 
+                    sep, 
+                    uint64 skip, 
+                    dates
+                ) |> Async.AwaitTask
+
+            return new DataFrame(handle)
+        }
     /// <summary>
     /// Get the schema of the DataFrame as a Map (Column Name -> Data Type String).
     /// </summary>
@@ -1051,6 +1114,31 @@ and LazyFrame(handle: LazyFrameHandle) =
     member this.Explain(?optimized: bool) = 
         let opt = defaultArg optimized true
         PolarsWrapper.Explain(handle, opt)
+    /// <summary>
+    /// Lazily scan a CSV file into a LazyFrame.
+    /// </summary>
+    static member scanCsv(path: string,
+                          ?schema: Map<string, DataType>,
+                          ?hasHeader: bool,
+                          ?separator: char,
+                          ?skipRows: int,
+                          ?tryParseDates: bool) : LazyFrame =
+        
+        let header = defaultArg hasHeader true
+        let sep = defaultArg separator ','
+        let skip = defaultArg skipRows 0
+        let dates = defaultArg tryParseDates true
+        
+        let schemaDict = 
+            match schema with
+            | Some m -> 
+                let d = Dictionary<string, DataTypeHandle>()
+                m |> Map.iter (fun k v -> d.Add(k, v.CreateHandle()))
+                d
+            | None -> null
+
+        let h = PolarsWrapper.ScanCsv(path, schemaDict, header, sep, uint64 skip, dates)
+        new LazyFrame(h)
 /// <summary>
 /// SQL Context for executing SQL queries on registered LazyFrames.
 /// </summary>

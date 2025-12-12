@@ -7,57 +7,100 @@ use std::ffi::CStr;
 use std::io::BufReader;
 use std::os::raw::c_char;
 use std::fs::File;
-use crate::types::{DataFrameContext, LazyFrameContext, ptr_to_str};
+use crate::types::{DataFrameContext,LazyFrameContext, ptr_to_str};
+use crate::datatypes::DataTypeContext;
 
 // ==========================================
 // 读取 csv
 // ==========================================
 #[unsafe(no_mangle)]
-pub extern "C" fn pl_read_csv(path_ptr: *const c_char, 
+pub extern "C" fn pl_read_csv(
+    path: *const c_char,
+    schema_names: *const *const c_char,
+    schema_types: *const *mut DataTypeContext,
+    schema_len: usize,
+    has_header: bool,
+    separator: u8,
+    skip_rows: usize,
     try_parse_dates: bool
 ) -> *mut DataFrameContext {
     ffi_try!({
-        let path = ptr_to_str(path_ptr).unwrap();
-
-        let mut options = CsvReadOptions::default();
+        let p = unsafe { CStr::from_ptr(path).to_string_lossy() };
         
-        // 使用 Arc::make_mut 获取可变引用
-        // 这句话的意思是："我要修改 parse_options 里的东西，帮我搞个可写的引用来"
-        std::sync::Arc::make_mut(&mut options.parse_options).try_parse_dates = try_parse_dates;
+        // 1. 构建 ParseOptions (处理分隔符和日期解析)
+        // 使用 builder 方法链式调用
+        let parse_options = CsvParseOptions::default()
+            .with_separator(separator)
+            .with_try_parse_dates(try_parse_dates);
 
-        // 读取数据，但 *不* 转换成 Arrow
+        // 2. 构建 ReadOptions (注入 parse_options)
+        let mut options = CsvReadOptions::default()
+            .with_has_header(has_header)
+            .with_skip_rows(skip_rows)
+            .with_parse_options(parse_options);
+
+        // 3. 处理 Schema Overrides
+        if !schema_names.is_null() && schema_len > 0 {
+            let names_slice = unsafe { std::slice::from_raw_parts(schema_names, schema_len) };
+            let types_slice = unsafe { std::slice::from_raw_parts(schema_types, schema_len) };
+            
+            // 使用 with_capacity
+            let mut schema = Schema::with_capacity(schema_len);
+            for i in 0..schema_len {
+                let name = unsafe { CStr::from_ptr(names_slice[i]).to_string_lossy().to_string() };
+                let ctx = unsafe { &*types_slice[i] };
+                schema.with_column(name.into(), ctx.dtype.clone());
+            }
+            
+            options = options.with_schema_overwrite(Some(Arc::new(schema)));
+        }
+
+        // 4. 执行读取
+        // p.into_owned().into() -> String -> PathBuf
         let df = options
-            .try_into_reader_with_file_path(Some(path.into()))
-            .map_err(|e| PolarsError::ComputeError(e.to_string().into()))? // 处理可能的 io error
+            .try_into_reader_with_file_path(Some(p.into_owned().into()))?
             .finish()?;
 
-        // 把 DataFrame 装箱，放到堆内存上，并返回指针
-        // Box::into_raw 告诉 Rust："我放弃管理这块内存，你把地址给我，别自动回收"
-        let context = Box::new(DataFrameContext { df });
-        Ok(Box::into_raw(context))
+        Ok(Box::into_raw(Box::new(DataFrameContext { df })))
     })
 }
-
 #[unsafe(no_mangle)]
-pub extern "C" fn pl_scan_csv(path_ptr: *const c_char,
-    try_parse_dates: bool
+pub extern "C" fn pl_scan_csv(
+    path: *const c_char,
+    schema_names: *const *const c_char,
+    schema_types: *const *mut DataTypeContext,
+    schema_len: usize,
+    has_header: bool,
+    separator: u8,
+    skip_rows: usize,
+    try_parse_dates: bool // [新增参数]
 ) -> *mut LazyFrameContext {
     ffi_try!({
-        let path = ptr_to_str(path_ptr).unwrap();
+        let p = unsafe { CStr::from_ptr(path).to_string_lossy() };
         
-        // 使用方案 A (PathBuf) 或方案 C (String)，取决于你刚才哪个跑通了
-        // 这里假设是用 PathBuf + cloud 关闭，或者 Path + cloud 开启 + new()
-        // 无论哪种，重点是最后一行：
-        
-        let lf = LazyCsvReader::new(PlPath::new(path))
-            .with_try_parse_dates(try_parse_dates)
-            .finish()?; // ? 使用合法
+        let mut reader = LazyCsvReader::new(PlPath::new(&p))
+            .with_has_header(has_header)
+            .with_separator(separator)
+            .with_skip_rows(skip_rows)
+            .with_try_parse_dates(try_parse_dates); // LazyReader 通常直接支持这个
 
-        // [重要修改] 必须包裹在 Ok() 里
-        Ok(Box::into_raw(Box::new(LazyFrameContext { inner: lf })))
+        // ... schema 逻辑 (记得用 Schema::with_capacity) ...
+        if !schema_names.is_null() && schema_len > 0 {
+             let names_slice = unsafe { std::slice::from_raw_parts(schema_names, schema_len) };
+             let types_slice = unsafe { std::slice::from_raw_parts(schema_types, schema_len) };
+             let mut schema = Schema::with_capacity(schema_len);
+             for i in 0..schema_len {
+                 let name = unsafe { CStr::from_ptr(names_slice[i]).to_string_lossy().to_string() };
+                 let ctx = unsafe { &*types_slice[i] };
+                 schema.with_column(name.into(), ctx.dtype.clone());
+             }
+             reader = reader.with_schema(Some(Arc::new(schema)));
+        }
+
+        let inner = reader.finish()?;
+        Ok(Box::into_raw(Box::new(LazyFrameContext { inner })))
     })
 }
-
 // ==========================================
 // 读取 Parquet
 // ==========================================

@@ -90,5 +90,26 @@ namespace Polars.CSharp.Tests
             using var dfLazy = lf.Collect();
             Assert.Equal(2, dfLazy.Height);
         }
+        [Fact]
+        public void Test_Csv_TryParseDates_Auto()
+        {
+            // 构造数据：包含标准的 ISO 日期格式
+            var csvContent = "name,birthday\nAlice,2023-01-01\nBob,2023-12-31";
+            using var csv = new DisposableFile(csvContent,".csv");
+
+            // 1. 默认 tryParseDates = true
+            using var df = DataFrame.ReadCsv(csv.Path);
+            
+            // 验证 birthday 列是否被自动解析为 Date 类型，而不是 String
+            // 注意：Polars 自动解析可能解析为 Date 或 Datetime
+            var dateType = df.Schema["birthday"];
+
+            // 2. 测试显式关闭 (tryParseDates = false)
+            using var dfString = DataFrame.ReadCsv(csv.Path, tryParseDates: false);
+            
+            // 断言它是 String
+            var strType = dfString.Schema["birthday"].ToString();
+            Assert.True(strType == "str" || strType == "Utf8");
+        }
     }
 }

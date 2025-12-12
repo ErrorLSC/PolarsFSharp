@@ -5,20 +5,78 @@ namespace Polars.Native;
 
 public static partial class PolarsWrapper
 {
-    public static DataFrameHandle ReadCsv(string path, bool tryParseDates)
+    private static T WithSchemaArrays<T>(
+            Dictionary<string, DataTypeHandle>? schema, 
+            Func<IntPtr[]?, IntPtr[]?, UIntPtr, T> action)
+        {
+            if (schema == null || schema.Count == 0)
+            {
+                return action(null, null, UIntPtr.Zero);
+            }
+
+            var names = schema.Keys.ToArray();
+            // DataTypeHandle 是 SafeHandle，DangerousGetHandle() 获取原始指针
+            var typeHandles = schema.Values.Select(h => h.DangerousGetHandle()).ToArray();
+            
+            return UseUtf8StringArray(names, namePtrs => 
+            {
+                return action(namePtrs, typeHandles, (UIntPtr)names.Length);
+            });
+        }
+    public static DataFrameHandle ReadCsv(
+            string path, 
+            Dictionary<string, DataTypeHandle>? schema = null,
+            bool hasHeader = true,
+            char separator = ',',
+            ulong skipRows = 0,
+            bool tryParseDates = true) // [新增] 默认开启
+        {
+            return WithSchemaArrays(schema, (namePtrs, typePtrs, len) => 
+            {
+                return ErrorHelper.Check(NativeBindings.pl_read_csv(
+                    path, 
+                    namePtrs, 
+                    typePtrs, 
+                    len, 
+                    hasHeader, 
+                    (byte)separator, 
+                    (UIntPtr)skipRows,
+                    tryParseDates
+                ));
+            });
+        }
+    public static Task<DataFrameHandle> ReadCsvAsync(
+            string path,
+            Dictionary<string, DataTypeHandle>? schema = null,
+            bool hasHeader = true,
+            char separator = ',',
+            ulong skipRows = 0, 
+            bool tryParseDates = true)
     {
-        if (!File.Exists(path)) throw new FileNotFoundException($"CSV not found: {path}");
-        return ErrorHelper.Check(NativeBindings.pl_read_csv(path, tryParseDates));
+        return Task.Run(() => ReadCsv(path,schema,hasHeader,separator,skipRows, tryParseDates));
     }
-    public static Task<DataFrameHandle> ReadCsvAsync(string path, bool tryParseDates)
-    {
-        return Task.Run(() => ReadCsv(path, tryParseDates));
-    }
-    public static LazyFrameHandle ScanCsv(string path, bool tryParseDates)
-    {
-        if (!File.Exists(path)) throw new FileNotFoundException($"CSV not found: {path}");
-        return ErrorHelper.Check(NativeBindings.pl_scan_csv(path, tryParseDates));
-    }
+    public static LazyFrameHandle ScanCsv(
+            string path, 
+            Dictionary<string, DataTypeHandle>? schema = null,
+            bool hasHeader = true,
+            char separator = ',',
+            ulong skipRows = 0,
+            bool tryParseDates = true) // [新增]
+        {
+            return WithSchemaArrays(schema, (namePtrs, typePtrs, len) => 
+            {
+                return ErrorHelper.Check(NativeBindings.pl_scan_csv(
+                    path, 
+                    namePtrs, 
+                    typePtrs, 
+                    len, 
+                    hasHeader, 
+                    (byte)separator, 
+                    (UIntPtr)skipRows,
+                    tryParseDates
+                ));
+            });
+        }
 
     public static DataFrameHandle ReadParquet(string path)
     {

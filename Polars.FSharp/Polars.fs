@@ -3,11 +3,13 @@ namespace Polars.FSharp
 open System
 open Apache.Arrow
 open Polars.Native
+open System.Collections.Generic
+open System.Threading.Tasks
 /// <summary>
 /// The main entry point for Polars operations in F#.
 /// </summary>
 module Polars =
-    open System.Threading.Tasks
+    
     
     // --- Factories ---
     /// <summary> Reference a column by name. </summary>
@@ -34,17 +36,10 @@ module Polars =
         ((^T or LitMechanism) : (static member ($) : LitMechanism * ^T -> Expr) (LitMechanism, value))
 
     // --- IO ---
-    /// <summary> Read a CSV file into a DataFrame (Eager). </summary>
-    let readCsv (path: string) (tryParseDates: bool option): DataFrame =
-        let parseDates = defaultArg tryParseDates true
-        let handle = PolarsWrapper.ReadCsv(path, parseDates)
-        new DataFrame(handle)
+
     /// <summary> Read a parquet file into a DataFrame (Eager). </summary>
     let readParquet (path: string) = new DataFrame(PolarsWrapper.ReadParquet path)
-    /// <summary> Scan a CSV file into a LazyFrame. </summary>
-    let scanCsv (path: string) (tryParseDates: bool option) = 
-        let parseDates = defaultArg tryParseDates true
-        new LazyFrame(PolarsWrapper.ScanCsv(path, parseDates))
+
     /// <summary> Scan a parquet file into a LazyFrame. </summary>
     let scanParquet (path: string) = new LazyFrame(PolarsWrapper.ScanParquet path)
     /// <summary> Read a JSON file into a DataFrame (Eager). </summary>
@@ -355,15 +350,7 @@ module Polars =
         let f = ifFalse.CloneHandle()
         
         new Expr(PolarsWrapper.IfElse(p, t, f))
-    // --- Async IO ---
 
-    /// <summary> Asynchronously read a CSV file into a DataFrame. </summary>
-    let readCsvAsync (path: string) (tryParseDates: bool option) : Async<DataFrame> =
-        async {
-            let parseDates = defaultArg tryParseDates true
-            let! handle = PolarsWrapper.ReadCsvAsync(path,parseDates) |> Async.AwaitTask
-            return new DataFrame(handle)
-        }
     // --- Async Execution ---
 
     /// <summary> 

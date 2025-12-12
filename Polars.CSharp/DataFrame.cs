@@ -70,16 +70,40 @@ public class DataFrame : IDisposable
     // ==========================================
     // Static IO Read
     // ==========================================
-    /// <summary>
-    /// Read CSV File
+/// <summary>
+    /// Reads a CSV file into a DataFrame.
     /// </summary>
-    /// <param name="path"></param>
-    /// <param name="tryParseDates"></param>
-    /// <returns></returns>
-    public static DataFrame ReadCsv(string path, bool tryParseDates = true)
+    /// <param name="path">Path to the CSV file.</param>
+    /// <param name="schema">Optional schema dictionary.</param>
+    /// <param name="hasHeader">Whether the CSV has a header row.</param>
+    /// <param name="separator">Character used as separator.</param>
+    /// <param name="skipRows">Choose how many rows should be skipped.</param>
+    /// <param name="tryParseDates">Whether to automatically try parsing dates/datetimes. Default is true.</param>
+    /// <returns>A new DataFrame.</returns>
+    public static DataFrame ReadCsv(
+        string path, 
+        Dictionary<string, DataType>? schema = null,
+        bool hasHeader = true, 
+        char separator = ',',
+        ulong skipRows = 0,
+        bool tryParseDates = true) // [新增参数]
     {
-        //
-        return new DataFrame(PolarsWrapper.ReadCsv(path, tryParseDates));
+        // 将 C# 的 DataType 转换为底层的 DataTypeHandle
+        var schemaHandles = schema?.ToDictionary(
+            kv => kv.Key, 
+            kv => kv.Value.Handle
+        );
+
+        var handle = PolarsWrapper.ReadCsv(
+            path, 
+            schemaHandles, 
+            hasHeader, 
+            separator, 
+            skipRows,
+            tryParseDates // 传递给 Wrapper
+        );
+
+        return new DataFrame(handle);
     }
     /// <summary>
     /// Read Parquet File
@@ -121,14 +145,32 @@ public class DataFrame : IDisposable
         return new DataFrame(PolarsWrapper.FromArrow(batch));
     }
     /// <summary>
-    /// Read a CSV file asynchronously.
+    /// Asynchronously reads a CSV file into a DataFrame.
     /// </summary>
-    public static async Task<DataFrame> ReadCsvAsync(string path, bool tryParseDates = true)
+    public static async Task<DataFrame> ReadCsvAsync(
+        string path,
+        Dictionary<string, DataType>? schema = null,
+        bool hasHeader = true,
+        char separator = ',',
+        ulong skipRows = 0,
+        bool tryParseDates = true) // [新增参数]
     {
-        var handle = await PolarsWrapper.ReadCsvAsync(path, tryParseDates);
+        var schemaHandles = schema?.ToDictionary(
+            kv => kv.Key, 
+            kv => kv.Value.Handle
+        );
+
+        var handle = await PolarsWrapper.ReadCsvAsync(
+            path, 
+            schemaHandles, 
+            hasHeader, 
+            separator, 
+            skipRows,
+            tryParseDates // 传递给 Wrapper
+        );
+
         return new DataFrame(handle);
     }
-
     /// <summary>
     /// Read a Parquet file asynchronously.
     /// </summary>
